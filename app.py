@@ -1,10 +1,11 @@
+import os
+import dropbox
 import pandas as pd
 import numpy as np
-import os
 import datetime
 import time
 
-# ▼ 設定値（自由に変更可能）
+# ▼ 設定値
 RSI_PERIOD = 14
 RSI_BUY_THRESHOLD = 45
 RSI_SELL_THRESHOLD = 55
@@ -22,11 +23,36 @@ SUPPORT_THRESHOLD = 1.05
 RESISTANCE_THRESHOLD = 0.95
 VOLATILITY_LOOKBACK = 26
 
-# ▼ 設定する日付（テスト用）
-TEST_DATE = ""  # 例: "20250517"（空欄の場合はリアルタイム）
+# ▼ 環境変数またはaccess_token.txtからアクセストークンを取得
+ACCESS_TOKEN = os.environ.get("DROPBOX_ACCESS_TOKEN")
 
-# ▼ 設定する時刻（テスト用）
-TEST_TIMES = []  # 例: ["1000", "1010", "1020"]（空欄の場合はリアルタイム）
+if not ACCESS_TOKEN:
+    with open("access_token.txt", "r") as f:
+        ACCESS_TOKEN = f.read().strip()
+
+# ▼ Dropboxクライアントの初期化
+try:
+    dbx = dropbox.Dropbox(ACCESS_TOKEN)
+    print("✅ Dropboxに接続しました。")
+except Exception as e:
+    print(f"🚫 Dropbox接続エラー: {e}")
+    exit(1)
+
+# ▼ ファイルダウンロード関数
+def download_csv_from_dropbox(file_name):
+    try:
+        dropbox_path = "/デイトレファイル/" + file_name
+        local_path = "/mnt/data/" + file_name
+        
+        with open(local_path, "wb") as f:
+            metadata, res = dbx.files_download(path=dropbox_path)
+            f.write(res.content)
+        
+        print(f"✅ ダウンロード完了: {dropbox_path} -> {local_path}")
+        return local_path
+    except Exception as e:
+        print(f"🚫 ファイルのダウンロードエラー: {e}")
+        return None
 
 # ▼ 改善版 RSI計算関数
 def calculate_rsi(prices, period=14):
@@ -118,36 +144,22 @@ def analyze_and_display_filtered_signals(file_path):
         output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_order, ordered=True)
         output_df = output_df.sort_values(by=["シグナル", "総合評価"], ascending=[True, False])
 
-        log_output = ""
-        for signal in signal_order:
-            log_output += f"■{signal}\n"
-            filtered_df = output_df[output_df["シグナル"] == signal]
-            if not filtered_df.empty:
-                for _, row in filtered_df.iterrows():
-                    log_output += f"{row['銘柄コード']} {row['銘柄名称']} 株価:{row['株価']}円 評価:{row['総合評価']}\n"
-            log_output += "\n"
-        
-        print(log_output)
+        print(output_df)
 
     except Exception as e:
         print(f"データ読み込みエラー: {e}")
 
 # ▼ 24時間監視ループ
 while True:
-    today_date = TEST_DATE if TEST_DATE else datetime.datetime.now().strftime("%Y%m%d")
+    today_date = datetime.datetime.now().strftime("%Y%m%d")
     current_time = datetime.datetime.now().strftime("%H%M")
-    time_slots = TEST_TIMES if TEST_TIMES else [current_time]
+    file_name = f"kabuteku{today_date}_{current_time}.csv"
     
-    for time_slot in time_slots:
-        file_name = f"kabuteku{today_date}_{time_slot}.csv"
-        file_path = f"/mnt/data/{file_name}"
-        
-        if os.path.exists(file_path):
-            print(f"📂 処理中ファイル: {file_name}")
-            analyze_and_display_filtered_signals(file_path)
-        else:
-            print(f"🚫 ファイルが見つかりません: {file_name}")
-        
-        time.sleep(60)
-    time.sleep(10)
-
+    file_path = download_csv_from_dropbox(file_name)
+    if file_path:
+        analyze_and_display_filtered_signals(file_path)
+    else:
+        print(f"🚫 ファイルが見つかりません: {file_name}")
+    
+    # 同じ時刻に複数回処理しないように1分待機
+    time.sleep(60)
