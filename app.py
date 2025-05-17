@@ -23,6 +23,12 @@ SUPPORT_THRESHOLD = 1.05
 RESISTANCE_THRESHOLD = 0.95
 VOLATILITY_LOOKBACK = 26
 
+# ▼ 設定する日付（テスト用）
+TEST_DATE = ""  # 例: "20250517"（空欄の場合はリアルタイム）
+
+# ▼ 設定する時刻（テスト用）
+TEST_TIMES = []  # 例: ["1000", "1010", "1020"]（空欄の場合はリアルタイム）
+
 # ▼ 環境変数またはaccess_token.txtからアクセストークンを取得
 ACCESS_TOKEN = os.environ.get("DROPBOX_ACCESS_TOKEN")
 
