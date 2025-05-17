@@ -28,7 +28,12 @@ except Exception as e:
 def download_csv_from_dropbox(file_name):
     try:
         dropbox_path = "/デイトレファイル/" + file_name
-        local_path = "/mnt/data/" + file_name
+        
+        # ローカルディレクトリを作成（Renderの/mnt/data/がない場合）
+        local_dir = "/tmp"
+        os.makedirs(local_dir, exist_ok=True)
+        
+        local_path = os.path.join(local_dir, file_name)
         
         with open(local_path, "wb") as f:
             metadata, res = dbx.files_download(path=dropbox_path)
