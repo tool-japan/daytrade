@@ -2,9 +2,22 @@ import os
 import dropbox
 import pandas as pd
 import numpy as np
-import datetime
+from datetime import datetime, timedelta, timezone
 import time
 import requests
+
+# ▼ JST（日本標準時）のタイムゾーン設定
+JST = timezone(timedelta(hours=9))
+
+# ▼ 現在の日本時間を取得する関数
+def get_japan_time():
+    return datetime.now(JST)
+
+# ▼ 設定する日付（テスト用）
+TEST_DATE = ""  # 例: "20250517"（空欄の場合はリアルタイム）
+
+# ▼ 設定する時刻（テスト用）
+TEST_TIMES = []  # 例: ["1000", "1010", "1020"]（空欄の場合はリアルタイム）
 
 # ▼ 設定値
 RSI_PERIOD = 14
@@ -23,12 +36,6 @@ PRICE_MIN_THRESHOLD = 500
 SUPPORT_THRESHOLD = 1.05
 RESISTANCE_THRESHOLD = 0.95
 VOLATILITY_LOOKBACK = 26
-
-# ▼ 設定する日付（テスト用）
-TEST_DATE = ""  # 例: "20250517"（空欄の場合はリアルタイム）
-
-# ▼ 設定する時刻（テスト用）
-TEST_TIMES = []  # 例: ["1000", "1010", "1020"]（空欄の場合はリアルタイム）
 
 # ▼ 環境変数から認証情報を取得
 CLIENT_ID = os.environ.get('DROPBOX_CLIENT_ID')
@@ -187,10 +194,14 @@ def analyze_and_display_filtered_signals(file_path):
 
 # ▼ 24時間監視ループ
 while True:
-    today_date = datetime.datetime.now().strftime("%Y%m%d")
-    current_time = datetime.datetime.now().strftime("%H%M")
+    # 日本時間で日付と時刻を取得
+    today_date = get_japan_time().strftime("%Y%m%d")
+    current_time = get_japan_time().strftime("%H%M")
+    
+    # ファイル名を日本時間で生成
     file_name = f"kabuteku{today_date}_{current_time}.csv"
     
+    # ファイルをダウンロードして分析
     file_path = download_csv_from_dropbox(file_name)
     if file_path:
         analyze_and_display_filtered_signals(file_path)
