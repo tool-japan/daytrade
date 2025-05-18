@@ -6,6 +6,15 @@ from datetime import datetime, timedelta, timezone
 import time
 import requests
 
+import sys
+
+
+# ▼ バッファリングの無効化（リアルタイム出力）
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
+print(f"📝 Pythonバージョン: {sys.version}")
+
 # ▼ JST（日本標準時）のタイムゾーン設定
 JST = timezone(timedelta(hours=9))
 
