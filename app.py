@@ -28,7 +28,7 @@ VOLATILITY_LOOKBACK = 26
 CLIENT_ID = os.environ.get('DROPBOX_CLIENT_ID')
 CLIENT_SECRET = os.environ.get('DROPBOX_CLIENT_SECRET')
 REFRESH_TOKEN = os.environ.get('DROPBOX_REFRESH_TOKEN')
-ACCESS_TOKEN_FILE = 'access_token.txt'
+ACCESS_TOKEN_FILE = '/tmp/access_token.txt'
 
 # ▼ アクセストークンをリフレッシュする関数
 def refresh_access_token():
