@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import datetime
 import time
+import requests
 
 # ▼ 設定値
 RSI_PERIOD = 14
@@ -23,39 +24,64 @@ SUPPORT_THRESHOLD = 1.05
 RESISTANCE_THRESHOLD = 0.95
 VOLATILITY_LOOKBACK = 26
 
-# ▼ 環境変数またはaccess_token.txtからアクセストークンを取得
-ACCESS_TOKEN = os.environ.get("DROPBOX_ACCESS_TOKEN")
+# ▼ 環境変数から認証情報を取得
+CLIENT_ID = os.environ.get('DROPBOX_CLIENT_ID')
+CLIENT_SECRET = os.environ.get('DROPBOX_CLIENT_SECRET')
+REFRESH_TOKEN = os.environ.get('DROPBOX_REFRESH_TOKEN')
+ACCESS_TOKEN_FILE = 'access_token.txt'
 
-if not ACCESS_TOKEN:
-    with open("access_token.txt", "r") as f:
+# ▼ アクセストークンをリフレッシュする関数
+def refresh_access_token():
+    url = 'https://api.dropbox.com/oauth2/token'
+    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    data = {
+        'grant_type': 'refresh_token',
+        'client_id': CLIENT_ID,
+        'client_secret': CLIENT_SECRET,
+        'refresh_token': REFRESH_TOKEN
+    }
+    try:
+        response = requests.post(url, headers=headers, data=data)
+        response.raise_for_status()
+        access_token = response.json().get('access_token')
+        with open(ACCESS_TOKEN_FILE, 'w') as f:
+            f.write(access_token)
+        print('✅ アクセストークンをリフレッシュしました。')
+        return access_token
+    except Exception as e:
+        print(f'🚫 アクセストークンのリフレッシュに失敗しました: {e}')
+        exit(1)
+
+# ▼ アクセストークンを取得またはリフレッシュ
+if os.path.exists(ACCESS_TOKEN_FILE):
+    with open(ACCESS_TOKEN_FILE, 'r') as f:
         ACCESS_TOKEN = f.read().strip()
+else:
+    ACCESS_TOKEN = refresh_access_token()
 
 # ▼ Dropboxクライアントの初期化
 try:
     dbx = dropbox.Dropbox(ACCESS_TOKEN)
-    print("✅ Dropboxに接続しました。")
-except Exception as e:
-    print(f"🚫 Dropbox接続エラー: {e}")
-    exit(1)
+    dbx.users_get_current_account()
+    print('✅ Dropboxに接続しました。')
+except dropbox.exceptions.AuthError:
+    print('⚠️ アクセストークンが無効です。リフレッシュを試みます...')
+    ACCESS_TOKEN = refresh_access_token()
+    dbx = dropbox.Dropbox(ACCESS_TOKEN)
 
 # ▼ ファイルダウンロード関数
 def download_csv_from_dropbox(file_name):
     try:
-        dropbox_path = "/デイトレファイル/" + file_name
-        
-        # Render環境の一時ディレクトリを使用
-        local_dir = "/tmp"
-        os.makedirs(local_dir, exist_ok=True)
-        local_path = os.path.join(local_dir, file_name)
-        
-        with open(local_path, "wb") as f:
+        dropbox_path = f'/デイトレファイル/{file_name}'
+        local_path = f'/tmp/{file_name}'
+        os.makedirs('/tmp', exist_ok=True)
+        with open(local_path, 'wb') as f:
             metadata, res = dbx.files_download(path=dropbox_path)
             f.write(res.content)
-        
-        print(f"✅ ダウンロード完了: {dropbox_path} -> {local_path}")
+        print(f'✅ ダウンロード完了: {dropbox_path} -> {local_path}')
         return local_path
     except Exception as e:
-        print(f"🚫 ファイルのダウンロードエラー: {e}")
+        print(f'🚫 ファイルのダウンロードエラー: {e}')
         return None
 
 # ▼ 改善版 RSI計算関数
