@@ -24,6 +24,12 @@ SUPPORT_THRESHOLD = 1.05
 RESISTANCE_THRESHOLD = 0.95
 VOLATILITY_LOOKBACK = 26
 
+# ▼ 設定する日付（テスト用）
+TEST_DATE = ""  # 例: "20250517"（空欄の場合はリアルタイム）
+
+# ▼ 設定する時刻（テスト用）
+TEST_TIMES = []  # 例: ["1000", "1010", "1020"]（空欄の場合はリアルタイム）
+
 # ▼ 環境変数から認証情報を取得
 CLIENT_ID = os.environ.get('DROPBOX_CLIENT_ID')
 CLIENT_SECRET = os.environ.get('DROPBOX_CLIENT_SECRET')
