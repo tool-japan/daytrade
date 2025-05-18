@@ -85,16 +85,17 @@ except dropbox.exceptions.AuthError:
 # ▼ ファイルダウンロード関数
 def download_csv_from_dropbox(file_name):
     try:
+        print(f"🔍 ファイルダウンロードを試みます: {file_name}")
         dropbox_path = f'/デイトレファイル/{file_name}'
         local_path = f'/tmp/{file_name}'
         os.makedirs('/tmp', exist_ok=True)
         with open(local_path, 'wb') as f:
             metadata, res = dbx.files_download(path=dropbox_path)
             f.write(res.content)
-        print(f'✅ ダウンロード完了: {dropbox_path} -> {local_path}')
+        print(f"✅ ダウンロード完了: {dropbox_path} -> {local_path}")
         return local_path
     except Exception as e:
-        print(f'🚫 ファイルのダウンロードエラー: {e}')
+        print(f"🚫 ファイルのダウンロードエラー: {e}")
         return None
 
 # ▼ 改善版 RSI計算関数
@@ -194,19 +195,26 @@ def analyze_and_display_filtered_signals(file_path):
 
 # ▼ 24時間監視ループ
 while True:
-    # 日本時間で日付と時刻を取得
-    today_date = get_japan_time().strftime("%Y%m%d")
-    current_time = get_japan_time().strftime("%H%M")
-    
-    # ファイル名を日本時間で生成
-    file_name = f"kabuteku{today_date}_{current_time}.csv"
-    
-    # ファイルをダウンロードして分析
-    file_path = download_csv_from_dropbox(file_name)
-    if file_path:
-        analyze_and_display_filtered_signals(file_path)
-    else:
-        print(f"🚫 ファイルが見つかりません: {file_name}")
-    
-    # 同じ時刻に複数回処理しないように1分待機
-    time.sleep(60)
+    try:
+        # 日本時間で日付と時刻を取得
+        today_date = TEST_DATE if TEST_DATE else get_japan_time().strftime("%Y%m%d")
+        current_time = f"{TEST_TIMES[0]:04d}" if TEST_TIMES else get_japan_time().strftime("%H%M")
+        
+        # ファイル名を日本時間で生成
+        file_name = f"kabuteku{today_date}_{current_time}.csv"
+        print(f"📂 処理対象ファイル: {file_name}")
+        
+        # ファイルをダウンロードして分析
+        file_path = download_csv_from_dropbox(file_name)
+        if file_path:
+            print(f"🔎 分析を開始します: {file_path}")
+            analyze_and_display_filtered_signals(file_path)
+        else:
+            print(f"🚫 ファイルが見つかりません: {file_name}")
+        
+        # 同じ時刻に複数回処理しないように1分待機
+        print("⏲️ 1分間待機中...")
+        time.sleep(60)
+
+    except Exception as e:
+        print(f"🚫 メインループエラー: {e}")
