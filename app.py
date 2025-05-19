@@ -36,6 +36,7 @@ BOARD_BALANCE_BUY_THRESHOLD = 1.0  # 最良買気配と最良売気配の比率�
 BOARD_BALANCE_SELL_THRESHOLD = 1.0  # 最良買気配と最良売気配の比率（売り優勢）
 TREND_LOOKBACK = 5  # 短期トレンドの計算期間
 PRICE_CONTINUITY_BARS = 5  # 価格の連続性チェック期間
+PRICE_CONTINUITY_THRESHOLD = 0.2  # 20%が連続であればOK（26本中5本）
 PRICE_MAX_THRESHOLD = 20000
 PRICE_MIN_THRESHOLD = 500
 SUPPORT_THRESHOLD = 1.05
@@ -144,6 +145,23 @@ def calculate_slope(prices, lookback=TREND_LOOKBACK):
     diffs = prices[-lookback:].diff()
     return diffs.mean()
 
+# ▼ 価格の連続性チェック
+def check_price_continuity(prices, threshold=PRICE_CONTINUITY_THRESHOLD):
+    diffs = prices.diff().dropna()
+    up_count = (diffs > 0).sum()
+    down_count = (diffs < 0).sum()
+    total = len(diffs)
+
+    # 上昇トレンドと下降トレンドの割合
+    up_ratio = up_count / total
+    down_ratio = down_count / total
+
+    # 連続性が閾値を超えているか
+    is_uptrend = up_ratio >= threshold
+    is_downtrend = down_ratio >= threshold
+
+    return is_uptrend, is_downtrend
+
 # ▼ シグナル判定関数
 def analyze_and_display_filtered_signals(file_path):
     try:
@@ -189,6 +207,8 @@ def analyze_and_display_filtered_signals(file_path):
                 is_downtrend = recent_prices.is_monotonic_decreasing
 
                 signal = "中立"
+
+                is_uptrend, is_downtrend = check_price_continuity(prices[-TREND_LOOKBACK:])
 
                 # 順張り買い目
                 if rsi > RSI_TREND_BUY_THRESHOLD and macd_hist > 0 and current_price > short_trend and short_trend > long_trend and volume_spike and slope > 0 and is_uptrend:
