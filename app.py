@@ -126,8 +126,17 @@ def analyze_and_display_filtered_signals(file_path):
         output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_order, ordered=True)
         output_df = output_df.sort_values(by=["シグナル", "ギャップ"], ascending=[True, False])
 
-        print(output_df)
+        log_output = ""
+        for signal in signal_order:
+            log_output += f"■{signal}"
+            filtered_df = output_df[output_df["シグナル"] == signal]
+            if not filtered_df.empty:
+                for _, row in filtered_df.iterrows():
+                    log_output += f"{row['銘柄コード']} {row['銘柄名称']} 株価:{row['株価']}円" 
+            log_output += ""
+        print(log_output)
         return output_df
+
 
     except Exception as e:
         print(f"データ読み込みエラー: {e}")
