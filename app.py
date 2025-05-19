@@ -43,9 +43,13 @@ VOLATILITY_LOOKBACK = 26
 
 # ▼ 出来高関連の設定
 VOLUME_SPIKE_MULTIPLIER = 1.0  # IQRスパイクの倍率
+VOLUME_CONFIRMATION_BARS = 3  # 出来高増加の確認に使用するバー数
+VOLUME_SPIKE_THRESHOLD = 0.01  # 最低出来高増加率（5%）
 
 # ▼ ブレイクアウトの設定
-BREAKOUT_THRESHOLD = 0.005  # 始値からの突破率（0.5%）
+BREAKOUT_THRESHOLD = 0.005  # 前日終値からの突破率（1%）
+BREAKOUT_LOOKBACK = 26  # ブレイクアウトの確認に使用する期間（15秒足26本）
+BREAKOUT_CONFIRMATION_BARS = 3  # 突破後に価格を維持する最低バー数
 
 
 # ▼ 改善版 RSI計算関数
@@ -77,34 +81,48 @@ def calculate_volume_spike(df):
     return df
 
 
-# ▼ ブレイクアウト計算関数
+# ▼ ブレイクアウト計算関数（15秒足26本）
 def detect_breakout(df):
     breakout_signals = []
     for _, row in df.iterrows():
         code = row["銘柄コード"]
         name = row["銘柄名称"]
-        open_price = float(row["始値"])
-        high_price = float(row["高値"])
-        low_price = float(row["安値"])
+        prices = pd.Series([row[f"G{i:02d}"] for i in range(1, BREAKOUT_LOOKBACK + 1)], dtype=float)
+        volumes = pd.Series([row[f"D{i:02d}"] for i in range(1, BREAKOUT_LOOKBACK + 1)], dtype=float)
+
+        # 前日終値を基準に変更
+        prev_close = float(row["前日終値"])
+        high_price = prices.max()
+        low_price = prices.min()
         current_price = float(row["現在値"])
 
-        # ロングブレイクアウト（始値 -> 安値 -> 始値 -> 高値突破）
-        if current_price > open_price * (1 + BREAKOUT_THRESHOLD) and low_price < open_price:
-            breakout_signals.append({
-                "銘柄コード": code,
-                "銘柄名称": name,
-                "シグナル": "買い目ブレイクアウト",
-                "株価": current_price
-            })
+        # ロングブレイクアウト
+        if current_price > prev_close * (1 + BREAKOUT_THRESHOLD) and low_price < prev_close:
+            # 突破後の価格維持確認
+            if all(prices[-BREAKOUT_CONFIRMATION_BARS:] > prev_close * (1 + BREAKOUT_THRESHOLD)):
+                # 出来高確認
+                recent_volumes = volumes[-VOLUME_CONFIRMATION_BARS:]
+                if (recent_volumes.pct_change().dropna() > VOLUME_SPIKE_THRESHOLD).all():
+                    breakout_signals.append({
+                        "銘柄コード": code,
+                        "銘柄名称": name,
+                        "シグナル": "ロングブレイクアウト",
+                        "株価": current_price
+                    })
 
-        # ショートブレイクアウト（始値 -> 高値 -> 始値 -> 安値突破）
-        if current_price < open_price * (1 - BREAKOUT_THRESHOLD) and high_price > open_price:
-            breakout_signals.append({
-                "銘柄コード": code,
-                "銘柄名称": name,
-                "シグナル": "売り目ブレイクアウト",
-                "株価": current_price
-            })
+        # ショートブレイクアウト
+        if current_price < prev_close * (1 - BREAKOUT_THRESHOLD) and high_price > prev_close:
+            # 突破後の価格維持確認
+            if all(prices[-BREAKOUT_CONFIRMATION_BARS:] < prev_close * (1 - BREAKOUT_THRESHOLD)):
+                # 出来高確認
+                recent_volumes = volumes[-VOLUME_CONFIRMATION_BARS:]
+                if (recent_volumes.pct_change().dropna() > VOLUME_SPIKE_THRESHOLD).all():
+                    breakout_signals.append({
+                        "銘柄コード": code,
+                        "銘柄名称": name,
+                        "シグナル": "ショートブレイクアウト",
+                        "株価": current_price
+                    })
 
     return breakout_signals
 
@@ -189,7 +207,7 @@ def analyze_and_display_filtered_signals(file_path):
                 print(f"データ処理エラー（{code}）: {e}")
 
         output_df = pd.DataFrame(output_data)
-        signal_order = ["順張り買い目", "逆張り買い目", "順張り売り目", "逆張り売り目", "買い目ブレイクアウト", "売り目ブレイクアウト"]
+        signal_order = ["順張り買い目", "逆張り買い目", "順張り売り目", "逆張り売り目", "ロングブレイクアウト", "ショートブレイクアウト"]
         output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_order, ordered=True)
         output_df = output_df.sort_values(by=["シグナル"], ascending=[True])
 
@@ -197,7 +215,6 @@ def analyze_and_display_filtered_signals(file_path):
 
     except Exception as e:
         print(f"データ読み込みエラー: {e}")
-
 
         
 
