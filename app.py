@@ -24,24 +24,28 @@ TEST_DATE = ""  # 例: "20250517"（空欄の場合はリアルタイム）
 TEST_TIMES = []  # 例: ["1000", "1010", "1020"]（空欄の場合はリアルタイム）
 
 # ▼ 設定値
-RSI_PERIOD = 14  # RSIの計算に使用する期間（14期間）
-RSI_BUY_THRESHOLD = 45  # 逆張り買いシグナルのRSI閾値（45以下で買い）
-RSI_SELL_THRESHOLD = 55  # 逆張り売りシグナルのRSI閾値（55以上で売り）
-RSI_TREND_BUY_THRESHOLD = 40  # 順張り買いシグナルのRSI閾値（40以上で買い）
-RSI_TREND_SELL_THRESHOLD = 60  # 順張り売りシグナルのRSI閾値（60以下で売り）
-MACD_SHORT = 12  # MACDの短期EMA期間（12期間）
-MACD_LONG = 26  # MACDの長期EMA期間（26期間）
-MACD_SIGNAL = 9  # MACDシグナルラインの期間（9期間）
-BOARD_BALANCE_BUY_THRESHOLD = 1.2  # 板のバランス閾値（1.2以上で買い優勢）
-BOARD_BALANCE_SELL_THRESHOLD = 0.8  # 板のバランス閾値（0.8以下で売り優勢）
-TREND_LOOKBACK = 5  # トレンド判定に使用する直近期間（5本）
-PRICE_MAX_THRESHOLD = 20000  # フィルタリングに使用する最大株価（20,000円）
-PRICE_MIN_THRESHOLD = 500  # フィルタリングに使用する最小株価（500円）
-SUPPORT_THRESHOLD = 1.05  # サポートライン閾値（安値の1.05倍以下で支持線割れと判断）
-RESISTANCE_THRESHOLD = 0.95  # レジスタンスライン閾値（高値の0.95倍以上で抵抗線突破と判断）
-VOLATILITY_LOOKBACK = 26  # ボラティリティ計算に使用する期間（26期間）
-GAP_THRESHOLD = 0.015  # ギャップ判定に使用する閾値（2%以上のギャップ）
+RSI_PERIOD = 14
+RSI_BUY_THRESHOLD = 45
+RSI_SELL_THRESHOLD = 55
+RSI_TREND_BUY_THRESHOLD = 40
+RSI_TREND_SELL_THRESHOLD = 60
+MACD_SHORT = 12
+MACD_LONG = 26
+MACD_SIGNAL = 9
+BOARD_BALANCE_BUY_THRESHOLD = 1.0
+BOARD_BALANCE_SELL_THRESHOLD = 1.0
+TREND_LOOKBACK = 5
+PRICE_MAX_THRESHOLD = 20000
+PRICE_MIN_THRESHOLD = 500
+SUPPORT_THRESHOLD = 1.05
+RESISTANCE_THRESHOLD = 0.95
+VOLATILITY_LOOKBACK = 26
 
+# ▼ 出来高関連の設定
+VOLUME_SPIKE_MULTIPLIER = 1.0  # IQRスパイクの倍率
+
+
+# ▼ 改善版 RSI計算関数
 def calculate_rsi(prices, period=14):
     deltas = prices.diff()
     gains = deltas.where(deltas > 0, 0)
@@ -54,16 +58,39 @@ def calculate_rsi(prices, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi.iloc[-1] if not rsi.empty else np.nan
 
+
+# ▼ 出来高スパイク計算関数
+def calculate_volume_spike(df):
+    volume_cols = [f"D{i:02d}" for i in range(1, 27)]
+    df["出来高増加率"] = (df["D01"] - df["D26"]) / df["D26"]
+    
+    # IQRの計算
+    Q1 = df["出来高増加率"].quantile(0.25)
+    Q3 = df["出来高増加率"].quantile(0.75)
+    IQR = Q3 - Q1
+    threshold = Q3 + VOLUME_SPIKE_MULTIPLIER * IQR
+    df["急増フラグ"] = df["出来高増加率"] > threshold
+
+    return df
+
+
+# ▼ シグナル判定関数
 def analyze_and_display_filtered_signals(file_path):
     try:
         df = pd.read_csv(file_path)
         df.columns = df.columns.str.strip().str.replace("　", "").str.replace(" ", "")
 
+        # 出来高スパイクを計算
+        df = calculate_volume_spike(df)
+
         price_columns = df.columns[31:57]
+
+        df_filtered = df[(df[price_columns].astype(float).max(axis=1) <= PRICE_MAX_THRESHOLD) &
+                         (df[price_columns].astype(float).min(axis=1) >= PRICE_MIN_THRESHOLD)]
 
         output_data = []
 
-        for _, row in df.iterrows():
+        for _, row in df_filtered.iterrows():
             try:
                 code = row["銘柄コード"]
                 name = row["銘柄名称"]
@@ -72,76 +99,67 @@ def analyze_and_display_filtered_signals(file_path):
                 current_price = float(row["現在値"])
                 high_price = float(row["高値"])
                 low_price = float(row["安値"])
-                prev_close = float(row["前日終値"])
-                open_price = float(row["始値"])
-                best_bid_qty = float(row["最良買気配数量"])
-                best_ask_qty = float(row["最良売気配数量"])
-                margin_buy = float(row["信用買残"])
-                margin_sell = float(row["信用売残"])
+                volume_spike = row["急増フラグ"]
 
-                # RSI計算
                 rsi = calculate_rsi(prices, period=RSI_PERIOD)
 
-                # MACD計算
                 ema_short = prices.ewm(span=MACD_SHORT, adjust=False).mean()
                 ema_long = prices.ewm(span=MACD_LONG, adjust=False).mean()
                 macd = ema_short - ema_long
                 macd_signal = macd.ewm(span=MACD_SIGNAL, adjust=False).mean()
                 macd_hist = macd.iloc[-1] - macd_signal.iloc[-1]
 
-                # ギャップ計算
-                gap_ratio = (open_price - prev_close) / prev_close
+                short_trend = prices[-TREND_LOOKBACK:].mean()
+                long_trend = prices.mean()
 
-                # 信用残高比
-                credit_ratio = margin_buy / margin_sell if margin_sell > 0 else np.nan
-
-                # シグナル判定
                 signal = "中立"
-                if rsi > RSI_TREND_BUY_THRESHOLD and macd_hist > 0 and current_price > low_price * SUPPORT_THRESHOLD and best_bid_qty > best_ask_qty * BOARD_BALANCE_BUY_THRESHOLD:
+                if rsi > RSI_TREND_BUY_THRESHOLD and macd_hist > 0 and current_price > short_trend and short_trend > long_trend and volume_spike:
                     signal = "順張り買い目"
-                elif rsi <= RSI_BUY_THRESHOLD and macd_hist > 0 and gap_ratio < -GAP_THRESHOLD:
+                elif rsi <= RSI_BUY_THRESHOLD and macd_hist > 0 and volume_spike:
                     signal = "逆張り買い目"
-                elif rsi < RSI_TREND_SELL_THRESHOLD and macd_hist < 0 and current_price < high_price * RESISTANCE_THRESHOLD and best_ask_qty > best_bid_qty * BOARD_BALANCE_SELL_THRESHOLD:
+                elif rsi < RSI_TREND_SELL_THRESHOLD and macd_hist < 0 and current_price < short_trend and short_trend < long_trend and volume_spike:
                     signal = "順張り売り目"
-                elif rsi >= RSI_SELL_THRESHOLD and macd_hist < 0 and gap_ratio > GAP_THRESHOLD:
+                elif rsi >= RSI_SELL_THRESHOLD and macd_hist < 0 and volume_spike:
                     signal = "逆張り売り目"
 
-                # 出力データに追加
+                if signal == "中立":
+                    continue
+
+                score = 0
+                if rsi <= RSI_BUY_THRESHOLD:
+                    score += 2
+                elif rsi > RSI_TREND_BUY_THRESHOLD:
+                    score += 1
+                if macd_hist > 0:
+                    score += 1
+                if current_price > short_trend and short_trend > long_trend:
+                    score += 1
+                if current_price < low_price * SUPPORT_THRESHOLD:
+                    score += 1
+
+                overall_rating = max(1, min(5, score))
+
                 output_data.append({
                     "銘柄コード": code,
                     "銘柄名称": name,
                     "シグナル": signal,
                     "株価": current_price,
-                    "ギャップ": gap_ratio,
-                    "信用残比": credit_ratio
+                    "総合評価": overall_rating
                 })
 
             except Exception as e:
                 print(f"データ処理エラー（{code}）: {e}")
 
-        # 結果の表示
         output_df = pd.DataFrame(output_data)
         signal_order = ["順張り買い目", "逆張り買い目", "順張り売り目", "逆張り売り目"]
         output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_order, ordered=True)
-        output_df = output_df.sort_values(by=["シグナル", "ギャップ"], ascending=[True, False])
+        output_df = output_df.sort_values(by=["シグナル", "総合評価"], ascending=[True, False])
 
-        log_output = ""
-        for signal in signal_order:
-            log_output += f"■{signal}"
-            filtered_df = output_df[output_df["シグナル"] == signal]
-            if not filtered_df.empty:
-                for _, row in filtered_df.iterrows():
-                    log_output += f"{row['銘柄コード']} {row['銘柄名称']} 株価:{row['株価']}円" 
-            log_output += ""
-        print(log_output)
-        return output_df
-
+        print(output_df)
 
     except Exception as e:
         print(f"データ読み込みエラー: {e}")
 
-        
-        
         
 
 # ▼ 環境変数から認証情報を取得
