@@ -32,8 +32,8 @@ RSI_TREND_SELL_THRESHOLD = 60
 MACD_SHORT = 12
 MACD_LONG = 26
 MACD_SIGNAL = 9
-BOARD_BALANCE_BUY_THRESHOLD = 1.0
-BOARD_BALANCE_SELL_THRESHOLD = 1.0
+BOARD_BALANCE_BUY_THRESHOLD = 1.0  # 最良買気配と最良売気配の比率（買い優勢）
+BOARD_BALANCE_SELL_THRESHOLD = 1.0  # 最良買気配と最良売気配の比率（売り優勢）
 TREND_LOOKBACK = 5
 PRICE_MAX_THRESHOLD = 20000
 PRICE_MIN_THRESHOLD = 500
@@ -42,12 +42,12 @@ RESISTANCE_THRESHOLD = 0.95
 VOLATILITY_LOOKBACK = 26
 
 # ▼ 出来高関連の設定
-VOLUME_SPIKE_MULTIPLIER = 1.0  # IQRスパイクの倍率
+VOLUME_SPIKE_MULTIPLIER = 1.5  # IQRスパイクの倍率
 VOLUME_CONFIRMATION_BARS = 3  # 出来高増加の確認に使用するバー数
-VOLUME_SPIKE_THRESHOLD = 0.01  # 最低出来高増加率（5%）
+VOLUME_SPIKE_THRESHOLD = 0.05  # 最低出来高増加率（5%）
 
 # ▼ ブレイクアウトの設定
-BREAKOUT_THRESHOLD = 0.005  # 前日終値からの突破率（1%）
+BREAKOUT_THRESHOLD = 0.01  # 前日終値からの突破率（1%）
 BREAKOUT_LOOKBACK = 26  # ブレイクアウトの確認に使用する期間（15秒足26本）
 BREAKOUT_CONFIRMATION_BARS = 3  # 突破後に価格を維持する最低バー数
 
@@ -66,19 +66,13 @@ def calculate_rsi(prices, period=14):
     return rsi.iloc[-1] if not rsi.empty else np.nan
 
 
-# ▼ 出来高スパイク計算関数
-def calculate_volume_spike(df):
-    volume_cols = [f"D{i:02d}" for i in range(1, 27)]
-    df["出来高増加率"] = (df["D01"] - df["D26"]) / df["D26"]
-    
-    # IQRの計算
-    Q1 = df["出来高増加率"].quantile(0.25)
-    Q3 = df["出来高増加率"].quantile(0.75)
-    IQR = Q3 - Q1
-    threshold = Q3 + VOLUME_SPIKE_MULTIPLIER * IQR
-    df["急増フラグ"] = df["出来高増加率"] > threshold
-
-    return df
+# ▼ 板バランス計算関数
+def calculate_board_balance(row):
+    buy_quantities = [row[f"最良買気配数量{i}"] for i in range(1, 6)]
+    sell_quantities = [row[f"最良売気配数量{i}"] for i in range(1, 6)]
+    total_buy = sum(buy_quantities)
+    total_sell = sum(sell_quantities)
+    return total_buy / total_sell if total_sell > 0 else float('inf')
 
 
 # ▼ ブレイクアウト計算関数（15秒足26本）
@@ -96,13 +90,16 @@ def detect_breakout(df):
         low_price = prices.min()
         current_price = float(row["現在値"])
 
+        # 板バランスの計算
+        board_balance = calculate_board_balance(row)
+
         # ロングブレイクアウト
         if current_price > prev_close * (1 + BREAKOUT_THRESHOLD) and low_price < prev_close:
             # 突破後の価格維持確認
             if all(prices[-BREAKOUT_CONFIRMATION_BARS:] > prev_close * (1 + BREAKOUT_THRESHOLD)):
                 # 出来高確認
                 recent_volumes = volumes[-VOLUME_CONFIRMATION_BARS:]
-                if (recent_volumes.pct_change().dropna() > VOLUME_SPIKE_THRESHOLD).all():
+                if (recent_volumes.pct_change().dropna() > VOLUME_SPIKE_THRESHOLD).all() and board_balance > BOARD_BALANCE_BUY_THRESHOLD:
                     breakout_signals.append({
                         "銘柄コード": code,
                         "銘柄名称": name,
@@ -116,7 +113,7 @@ def detect_breakout(df):
             if all(prices[-BREAKOUT_CONFIRMATION_BARS:] < prev_close * (1 - BREAKOUT_THRESHOLD)):
                 # 出来高確認
                 recent_volumes = volumes[-VOLUME_CONFIRMATION_BARS:]
-                if (recent_volumes.pct_change().dropna() > VOLUME_SPIKE_THRESHOLD).all():
+                if (recent_volumes.pct_change().dropna() > VOLUME_SPIKE_THRESHOLD).all() and board_balance < BOARD_BALANCE_SELL_THRESHOLD:
                     breakout_signals.append({
                         "銘柄コード": code,
                         "銘柄名称": name,
