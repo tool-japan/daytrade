@@ -74,6 +74,20 @@ def calculate_board_balance(row):
     total_sell = sum(sell_quantities)
     return total_buy / total_sell if total_sell > 0 else float('inf')
 
+# ▼ 出来高スパイク計算関数
+def calculate_volume_spike(df):
+    volume_cols = [f"D{i:02d}" for i in range(1, 27)]
+    df["出来高増加率"] = (df["D01"] - df["D26"]) / df["D26"]
+    
+    # IQRの計算
+    Q1 = df["出来高増加率"].quantile(0.25)
+    Q3 = df["出来高増加率"].quantile(0.75)
+    IQR = Q3 - Q1
+    threshold = Q3 + VOLUME_SPIKE_MULTIPLIER * IQR
+    
+    df["急増フラグ"] = df["出来高増加率"] > threshold
+
+    return df
 
 # ▼ ブレイクアウト計算関数（15秒足26本）
 def detect_breakout(df):
