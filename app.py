@@ -44,6 +44,9 @@ VOLATILITY_LOOKBACK = 26
 # ▼ 出来高関連の設定
 VOLUME_SPIKE_MULTIPLIER = 1.0  # IQRスパイクの倍率
 
+# ▼ ブレイクアウトの設定
+BREAKOUT_THRESHOLD = 0.005  # 始値からの突破率（0.5%）
+
 
 # ▼ 改善版 RSI計算関数
 def calculate_rsi(prices, period=14):
@@ -74,6 +77,38 @@ def calculate_volume_spike(df):
     return df
 
 
+# ▼ ブレイクアウト計算関数
+def detect_breakout(df):
+    breakout_signals = []
+    for _, row in df.iterrows():
+        code = row["銘柄コード"]
+        name = row["銘柄名称"]
+        open_price = float(row["始値"])
+        high_price = float(row["高値"])
+        low_price = float(row["安値"])
+        current_price = float(row["現在値"])
+
+        # ロングブレイクアウト（始値 -> 安値 -> 始値 -> 高値突破）
+        if current_price > open_price * (1 + BREAKOUT_THRESHOLD) and low_price < open_price:
+            breakout_signals.append({
+                "銘柄コード": code,
+                "銘柄名称": name,
+                "シグナル": "買い目ブレイクアウト",
+                "株価": current_price
+            })
+
+        # ショートブレイクアウト（始値 -> 高値 -> 始値 -> 安値突破）
+        if current_price < open_price * (1 - BREAKOUT_THRESHOLD) and high_price > open_price:
+            breakout_signals.append({
+                "銘柄コード": code,
+                "銘柄名称": name,
+                "シグナル": "売り目ブレイクアウト",
+                "株価": current_price
+            })
+
+    return breakout_signals
+
+
 # ▼ シグナル判定関数
 def analyze_and_display_filtered_signals(file_path):
     try:
@@ -83,12 +118,15 @@ def analyze_and_display_filtered_signals(file_path):
         # 出来高スパイクを計算
         df = calculate_volume_spike(df)
 
+        # ブレイクアウトを計算
+        breakout_signals = detect_breakout(df)
+
         price_columns = df.columns[31:57]
 
         df_filtered = df[(df[price_columns].astype(float).max(axis=1) <= PRICE_MAX_THRESHOLD) &
                          (df[price_columns].astype(float).min(axis=1) >= PRICE_MIN_THRESHOLD)]
 
-        output_data = []
+        output_data = breakout_signals
 
         for _, row in df_filtered.iterrows():
             try:
@@ -151,14 +189,15 @@ def analyze_and_display_filtered_signals(file_path):
                 print(f"データ処理エラー（{code}）: {e}")
 
         output_df = pd.DataFrame(output_data)
-        signal_order = ["順張り買い目", "逆張り買い目", "順張り売り目", "逆張り売り目"]
+        signal_order = ["順張り買い目", "逆張り買い目", "順張り売り目", "逆張り売り目", "買い目ブレイクアウト", "売り目ブレイクアウト"]
         output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_order, ordered=True)
-        output_df = output_df.sort_values(by=["シグナル", "総合評価"], ascending=[True, False])
+        output_df = output_df.sort_values(by=["シグナル"], ascending=[True])
 
         print(output_df)
 
     except Exception as e:
         print(f"データ読み込みエラー: {e}")
+
 
         
 
