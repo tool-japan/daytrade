@@ -34,9 +34,7 @@ MACD_LONG = 26
 MACD_SIGNAL = 9
 BOARD_BALANCE_BUY_THRESHOLD = 1.0  # 最良買気配と最良売気配の比率（買い優勢）
 BOARD_BALANCE_SELL_THRESHOLD = 1.0  # 最良買気配と最良売気配の比率（売り優勢）
-TREND_LOOKBACK = 5  # 短期トレンドの計算期間
-PRICE_CONTINUITY_BARS = 5  # 価格の連続性チェック期間
-PRICE_CONTINUITY_THRESHOLD = 0.2  # 20%が連続であればOK（26本中5本）
+TREND_LOOKBACK = 5
 PRICE_MAX_THRESHOLD = 20000
 PRICE_MIN_THRESHOLD = 500
 SUPPORT_THRESHOLD = 1.05
@@ -140,28 +138,6 @@ def detect_breakout(df):
     return breakout_signals
 
 
-# ▼ トレンドの傾き計算
-def calculate_slope(prices, lookback=TREND_LOOKBACK):
-    diffs = prices[-lookback:].diff()
-    return diffs.mean()
-
-# ▼ 価格の連続性チェック
-def check_price_continuity(prices, threshold=PRICE_CONTINUITY_THRESHOLD):
-    diffs = prices.diff().dropna()
-    up_count = (diffs > 0).sum()
-    down_count = (diffs < 0).sum()
-    total = len(diffs)
-
-    # 上昇トレンドと下降トレンドの割合
-    up_ratio = up_count / total
-    down_ratio = down_count / total
-
-    # 連続性が閾値を超えているか
-    is_uptrend = up_ratio >= threshold
-    is_downtrend = down_ratio >= threshold
-
-    return is_uptrend, is_downtrend
-
 # ▼ シグナル判定関数
 def analyze_and_display_filtered_signals(file_path):
     try:
@@ -171,12 +147,15 @@ def analyze_and_display_filtered_signals(file_path):
         # 出来高スパイクを計算
         df = calculate_volume_spike(df)
 
+        # ブレイクアウトを計算
+        breakout_signals = detect_breakout(df)
+
         price_columns = df.columns[31:57]
 
         df_filtered = df[(df[price_columns].astype(float).max(axis=1) <= PRICE_MAX_THRESHOLD) &
                          (df[price_columns].astype(float).min(axis=1) >= PRICE_MIN_THRESHOLD)]
 
-        output_data = []
+        output_data = breakout_signals
 
         for _, row in df_filtered.iterrows():
             try:
@@ -199,28 +178,15 @@ def analyze_and_display_filtered_signals(file_path):
 
                 short_trend = prices[-TREND_LOOKBACK:].mean()
                 long_trend = prices.mean()
-                slope = calculate_slope(prices, TREND_LOOKBACK)
-
-                # 価格の連続性チェック（設定値で変更可能に）
-                recent_prices = prices[-PRICE_CONTINUITY_BARS:]
-                is_uptrend = recent_prices.is_monotonic_increasing
-                is_downtrend = recent_prices.is_monotonic_decreasing
 
                 signal = "中立"
-
-                is_uptrend, is_downtrend = check_price_continuity(prices[-TREND_LOOKBACK:])
-
-                # 順張り買い目
-                if rsi > RSI_TREND_BUY_THRESHOLD and macd_hist > 0 and current_price > short_trend and short_trend > long_trend and volume_spike and slope > 0 and is_uptrend:
+                if rsi > RSI_TREND_BUY_THRESHOLD and macd_hist > 0 and current_price > short_trend and short_trend > long_trend and volume_spike:
                     signal = "順張り買い目"
-                # 逆張り買い目
-                elif rsi <= RSI_BUY_THRESHOLD and macd_hist > 0 and volume_spike and slope > 0 and is_uptrend:
+                elif rsi <= RSI_BUY_THRESHOLD and macd_hist > 0 and volume_spike:
                     signal = "逆張り買い目"
-                # 順張り売り目
-                elif rsi < RSI_TREND_SELL_THRESHOLD and macd_hist < 0 and current_price < short_trend and short_trend < long_trend and volume_spike and slope < 0 and is_downtrend:
+                elif rsi < RSI_TREND_SELL_THRESHOLD and macd_hist < 0 and current_price < short_trend and short_trend < long_trend and volume_spike:
                     signal = "順張り売り目"
-                # 逆張り売り目
-                elif rsi >= RSI_SELL_THRESHOLD and macd_hist < 0 and volume_spike and slope < 0 and is_downtrend:
+                elif rsi >= RSI_SELL_THRESHOLD and macd_hist < 0 and volume_spike:
                     signal = "逆張り売り目"
 
                 if signal == "中立":
@@ -260,7 +226,6 @@ def analyze_and_display_filtered_signals(file_path):
 
     except Exception as e:
         print(f"データ読み込みエラー: {e}")
-
 
         
 
