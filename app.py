@@ -42,12 +42,12 @@ RESISTANCE_THRESHOLD = 0.95
 VOLATILITY_LOOKBACK = 26
 
 # ▼ 出来高関連の設定
-VOLUME_SPIKE_MULTIPLIER = 1.5  # IQRスパイクの倍率
+VOLUME_SPIKE_MULTIPLIER = 1.0  # IQRスパイクの倍率
 VOLUME_CONFIRMATION_BARS = 3  # 出来高増加の確認に使用するバー数
 VOLUME_SPIKE_THRESHOLD = 0.05  # 最低出来高増加率（5%）
 
 # ▼ ブレイクアウトの設定
-BREAKOUT_THRESHOLD = 0.01  # 前日終値からの突破率（1%）
+BREAKOUT_THRESHOLD = 0.005  # 前日終値からの突破率（1%）
 BREAKOUT_LOOKBACK = 26  # ブレイクアウトの確認に使用する期間（15秒足26本）
 BREAKOUT_CONFIRMATION_BARS = 3  # 突破後に価格を維持する最低バー数
 
