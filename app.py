@@ -55,41 +55,47 @@ BREAKOUT_CONFIRMATION_BARS = 3  # 突破後に価格を維持する最低バー�
 
 # ▼ 整形テキストを作る関数
 def format_output_text(df):
-    grouped = df.groupby("シグナル")
+    grouped = df.groupby("シグナル", observed=False)  # FutureWarning対応
     lines = []
     for signal, group in grouped:
         lines.append(f"■ {signal}")
         for _, row in group.iterrows():
             lines.append(f"{row['銘柄コード']} {row['銘柄名称']} 株価: {int(row['株価'])}円")
-        lines.append("")  # 空行で区切り
+        lines.append("")  # 区切り
     return "\n".join(lines)
 
-# ▼ ログ送信専用関数（SendGrid使用）
+# ▼ メール送信関数（BCC対応）
 def send_output_dataframe_via_email(output_data):
     try:
-        # DataFrameの整形とテキスト整形（省略）
+        # DataFrameを作成・整形
+        output_df = pd.DataFrame(output_data)
+        signal_order = ["順張り買い目", "逆張り買い目", "順張り売り目", "逆張り売り目", "ロングブレイクアウト", "ショートブレイクアウト"]
+        output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_order, ordered=True)
+        output_df = output_df.sort_values(by=["シグナル"], ascending=[True])
 
-        # 環境変数の取得
+        # 🔧 ← ここが重要！
+        message_text = format_output_text(output_df)
+
+        # 環境変数を取得
         sendgrid_api_key = os.environ.get("SENDGRID_API_KEY")
         sender_email = os.environ.get("SENDER_EMAIL")
         email_list_path = "email_list.txt"
         email_subject = "【株式テクニカル分析検出通知】"
 
-        # 送信先を読み込み（BCC用）
+        # メール送信先を読み込み（BCC）
         with open(email_list_path, "r", encoding="utf-8") as f:
             recipient_emails = [email.strip() for email in f if email.strip()]
 
-        # メール作成（To: 自分、BCC: 全体）
+        # メール作成（Toは自分、BCCに全体）
         message = Mail(
             from_email=Email(sender_email),
-            to_emails=To(sender_email),  # ← 自分宛に To
+            to_emails=To(sender_email),
             subject=email_subject,
             plain_text_content=message_text
         )
-        # BCC追加
         message.bcc = [Bcc(email) for email in recipient_emails]
 
-        # 送信
+        # メール送信
         sg = SendGridAPIClient(sendgrid_api_key)
         response = sg.send(message)
         print(f"✅ メール送信完了（BCCモード）: ステータスコード = {response.status_code}")
