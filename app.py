@@ -53,7 +53,18 @@ BREAKOUT_LOOKBACK = 26  # ブレイクアウトの確認に使用する期間（
 BREAKOUT_CONFIRMATION_BARS = 3  # 突破後に価格を維持する最低バー数
 
 
-# ▼ ログ送信専用関数
+# ▼ 整形テキストを作る関数
+def format_output_text(df):
+    grouped = df.groupby("シグナル")
+    lines = []
+    for signal, group in grouped:
+        lines.append(f"■ {signal}")
+        for _, row in group.iterrows():
+            lines.append(f"{row['銘柄コード']} {row['銘柄名称']} 株価: {int(row['株価'])}円")
+        lines.append("")  # 空行で区切り
+    return "\n".join(lines)
+
+# ▼ ログ送信専用関数（SendGrid使用）
 def send_output_dataframe_via_email(output_data):
     try:
         # DataFrameの整形
@@ -62,23 +73,29 @@ def send_output_dataframe_via_email(output_data):
         output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_order, ordered=True)
         output_df = output_df.sort_values(by=["シグナル"], ascending=[True])
 
-        # 表形式をテキストに整形
-        message_text = output_df.to_string(index=False)
+        # 整形したテキストを作成
+        message_text = format_output_text(output_df)
+
+        # 環境変数から取得
+        sendgrid_api_key = os.environ.get("SENDGRID_API_KEY")
+        sender_email = os.environ.get("SENDER_EMAIL")
+        email_list_path = "email_list.txt"
+        email_subject = "【株式テクニカル分析検出通知】"
 
         # メール送信先を読み込み
-        with open(EMAIL_LIST_PATH, "r", encoding="utf-8") as f:
+        with open(email_list_path, "r", encoding="utf-8") as f:
             recipients = [To(email.strip()) for email in f if email.strip()]
 
         # メール本文とオブジェクト作成
         message = Mail(
-            from_email=SENDER_EMAIL,
+            from_email=sender_email,
             to_emails=recipients,
-            subject=EMAIL_SUBJECT,
+            subject=email_subject,
             plain_text_content=message_text
         )
 
         # 送信
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        sg = SendGridAPIClient(sendgrid_api_key)
         response = sg.send(message)
         print(f"✅ メール送信完了: ステータスコード = {response.status_code}")
 
