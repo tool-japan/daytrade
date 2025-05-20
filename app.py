@@ -55,14 +55,22 @@ BREAKOUT_CONFIRMATION_BARS = 3  # 突破後に価格を維持する最低バー�
 
 # ▼ 整形テキストを作る関数
 def format_output_text(df):
-    grouped = df.groupby("シグナル", observed=False)  # FutureWarning対応
+    grouped = df.groupby("シグナル", observed=False)
     lines = []
     for signal, group in grouped:
         lines.append(f"■ {signal}")
         for _, row in group.iterrows():
             lines.append(f"{row['銘柄コード']} {row['銘柄名称']} 株価: {int(row['株価'])}円")
-        lines.append("")  # 区切り
+        lines.append("")  # 空行で区切り
+
+    # ▼ 末尾に注意書きを追加
+    lines.append("【ご注意】")
+    lines.append("本分析は、特定の銘柄の売買を推奨するものではありません。")
+    lines.append("出力内容はあくまでテクニカル分析に基づく参考情報であり、最終的な投資判断はご自身の責任で慎重に行ってください。")
+    lines.append("市場動向は常に変動するため、本分析の結果に過信せず、複数の情報を組み合わせた冷静な判断を心がけてください。")
+
     return "\n".join(lines)
+
 
 # ▼ メール送信関数（BCC対応）
 def send_output_dataframe_via_email(output_data):
