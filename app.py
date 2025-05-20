@@ -52,6 +52,14 @@ BREAKOUT_LOOKBACK = 26  # ブレイクアウトの確認に使用する期間（
 BREAKOUT_CONFIRMATION_BARS = 3  # 突破後に価格を維持する最低バー数
 
 
+# ▼ ログ出力専用関数
+def display_output_dataframe(output_data):
+    output_df = pd.DataFrame(output_data)
+    signal_order = ["順張り買い目", "逆張り買い目", "順張り売り目", "逆張り売り目", "ロングブレイクアウト", "ショートブレイクアウト"]
+    output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_order, ordered=True)
+    output_df = output_df.sort_values(by=["シグナル"], ascending=[True])
+    print(output_df)
+
 # ▼ 改善版 RSI計算関数
 def calculate_rsi(prices, period=14):
     deltas = prices.diff()
@@ -137,8 +145,7 @@ def detect_breakout(df):
 
     return breakout_signals
 
-
-# ▼ シグナル判定関数
+# ▼ シグナル判定関数（score削除、ログ出力分離）
 def analyze_and_display_filtered_signals(file_path):
     try:
         df = pd.read_csv(file_path)
@@ -192,40 +199,22 @@ def analyze_and_display_filtered_signals(file_path):
                 if signal == "中立":
                     continue
 
-                score = 0
-                if rsi <= RSI_BUY_THRESHOLD:
-                    score += 2
-                elif rsi > RSI_TREND_BUY_THRESHOLD:
-                    score += 1
-                if macd_hist > 0:
-                    score += 1
-                if current_price > short_trend and short_trend > long_trend:
-                    score += 1
-                if current_price < low_price * SUPPORT_THRESHOLD:
-                    score += 1
-
-                overall_rating = max(1, min(5, score))
-
                 output_data.append({
                     "銘柄コード": code,
                     "銘柄名称": name,
                     "シグナル": signal,
-                    "株価": current_price,
-                    "総合評価": overall_rating
+                    "株価": current_price
                 })
 
             except Exception as e:
                 print(f"データ処理エラー（{code}）: {e}")
 
-        output_df = pd.DataFrame(output_data)
-        signal_order = ["順張り買い目", "逆張り買い目", "順張り売り目", "逆張り売り目", "ロングブレイクアウト", "ショートブレイクアウト"]
-        output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_order, ordered=True)
-        output_df = output_df.sort_values(by=["シグナル"], ascending=[True])
-
-        print(output_df)
+        # 分離したログ出力関数で表示
+        display_output_dataframe(output_data)
 
     except Exception as e:
         print(f"データ読み込みエラー: {e}")
+
 
 
 # ▼ バッファリングの無効化（リアルタイム出力）
