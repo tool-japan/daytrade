@@ -6,7 +6,8 @@ from datetime import datetime, timedelta, timezone
 import time
 import requests
 import sys
-
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, To
 
 print(f"📝 Pythonバージョン: {sys.version}")
 
@@ -52,13 +53,37 @@ BREAKOUT_LOOKBACK = 26  # ブレイクアウトの確認に使用する期間（
 BREAKOUT_CONFIRMATION_BARS = 3  # 突破後に価格を維持する最低バー数
 
 
-# ▼ ログ出力専用関数
-def display_output_dataframe(output_data):
-    output_df = pd.DataFrame(output_data)
-    signal_order = ["順張り買い目", "逆張り買い目", "順張り売り目", "逆張り売り目", "ロングブレイクアウト", "ショートブレイクアウト"]
-    output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_order, ordered=True)
-    output_df = output_df.sort_values(by=["シグナル"], ascending=[True])
-    print(output_df)
+# ▼ ログ送信専用関数
+def send_output_dataframe_via_email(output_data):
+    try:
+        # DataFrameの整形
+        output_df = pd.DataFrame(output_data)
+        signal_order = ["順張り買い目", "逆張り買い目", "順張り売り目", "逆張り売り目", "ロングブレイクアウト", "ショートブレイクアウト"]
+        output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_order, ordered=True)
+        output_df = output_df.sort_values(by=["シグナル"], ascending=[True])
+
+        # 表形式をテキストに整形
+        message_text = output_df.to_string(index=False)
+
+        # メール送信先を読み込み
+        with open(EMAIL_LIST_PATH, "r", encoding="utf-8") as f:
+            recipients = [To(email.strip()) for email in f if email.strip()]
+
+        # メール本文とオブジェクト作成
+        message = Mail(
+            from_email=SENDER_EMAIL,
+            to_emails=recipients,
+            subject=EMAIL_SUBJECT,
+            plain_text_content=message_text
+        )
+
+        # 送信
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        response = sg.send(message)
+        print(f"✅ メール送信完了: ステータスコード = {response.status_code}")
+
+    except Exception as e:
+        print(f"🚫 メール送信エラー: {e}")
 
 # ▼ 改善版 RSI計算関数
 def calculate_rsi(prices, period=14):
