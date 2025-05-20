@@ -252,7 +252,7 @@ def analyze_and_display_filtered_signals(file_path):
                 print(f"データ処理エラー（{code}）: {e}")
 
         # 分離したログ出力関数で表示
-        display_output_dataframe(output_data)
+        send_output_dataframe_via_email(output_data)
 
     except Exception as e:
         print(f"データ読み込みエラー: {e}")
