@@ -253,19 +253,24 @@ def refresh_access_token():
         response = requests.post(url, headers=headers, data=data)
         response.raise_for_status()
         access_token = response.json().get('access_token')
+        
+        # アクセストークンを一時ファイルに保存
         with open(ACCESS_TOKEN_FILE, 'w') as f:
             f.write(access_token)
+        
         print('✅ アクセストークンをリフレッシュしました。')
         return access_token
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         print(f'🚫 アクセストークンのリフレッシュに失敗しました: {e}')
         exit(1)
+
 
 # ▼ アクセストークンを取得またはリフレッシュ
 if os.path.exists(ACCESS_TOKEN_FILE):
     with open(ACCESS_TOKEN_FILE, 'r') as f:
         ACCESS_TOKEN = f.read().strip()
 else:
+    print("⚠️ アクセストークンが見つかりません。リフレッシュを試みます...")
     ACCESS_TOKEN = refresh_access_token()
 
 # ▼ Dropboxクライアントの初期化
@@ -273,10 +278,17 @@ try:
     dbx = dropbox.Dropbox(ACCESS_TOKEN)
     dbx.users_get_current_account()
     print('✅ Dropboxに接続しました。')
-except dropbox.exceptions.AuthError:
-    print('⚠️ アクセストークンが無効です。リフレッシュを試みます...')
+except dropbox.exceptions.AuthError as e:
+    print(f'⚠️ アクセストークンが無効です。リフレッシュを試みます... {e}')
     ACCESS_TOKEN = refresh_access_token()
     dbx = dropbox.Dropbox(ACCESS_TOKEN)
+    try:
+        dbx.users_get_current_account()
+        print('✅ Dropboxに再接続しました。')
+    except Exception as e2:
+        print(f'🚫 Dropboxへの再接続に失敗しました: {e2}')
+        exit(1)
+
 
 # ▼ ファイルダウンロード関数
 def download_csv_from_dropbox(file_name):
