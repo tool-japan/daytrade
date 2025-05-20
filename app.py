@@ -227,17 +227,19 @@ def analyze_and_display_filtered_signals(file_path):
     except Exception as e:
         print(f"データ読み込みエラー: {e}")
 
-        
+
+# ▼ バッファリングの無効化（リアルタイム出力）
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)      
+
+import os
+import requests
+import dropbox
 
 # ▼ 環境変数から認証情報を取得
 CLIENT_ID = os.environ.get('DROPBOX_CLIENT_ID')
 CLIENT_SECRET = os.environ.get('DROPBOX_CLIENT_SECRET')
 REFRESH_TOKEN = os.environ.get('DROPBOX_REFRESH_TOKEN')
-ACCESS_TOKEN_FILE = '/tmp/access_token.txt'
-
-# ▼ バッファリングの無効化（リアルタイム出力）
-sys.stdout.reconfigure(line_buffering=True)
-sys.stderr.reconfigure(line_buffering=True)
 
 # ▼ アクセストークンをリフレッシュする関数
 def refresh_access_token():
@@ -253,42 +255,26 @@ def refresh_access_token():
         response = requests.post(url, headers=headers, data=data)
         response.raise_for_status()
         access_token = response.json().get('access_token')
-        
-        # アクセストークンを一時ファイルに保存
-        with open(ACCESS_TOKEN_FILE, 'w') as f:
-            f.write(access_token)
-        
         print('✅ アクセストークンをリフレッシュしました。')
         return access_token
     except requests.exceptions.RequestException as e:
         print(f'🚫 アクセストークンのリフレッシュに失敗しました: {e}')
         exit(1)
 
-
-# ▼ アクセストークンを取得またはリフレッシュ
-if os.path.exists(ACCESS_TOKEN_FILE):
-    with open(ACCESS_TOKEN_FILE, 'r') as f:
-        ACCESS_TOKEN = f.read().strip()
-else:
-    print("⚠️ アクセストークンが見つかりません。リフレッシュを試みます...")
-    ACCESS_TOKEN = refresh_access_token()
-
-# ▼ Dropboxクライアントの初期化
-try:
-    dbx = dropbox.Dropbox(ACCESS_TOKEN)
-    dbx.users_get_current_account()
-    print('✅ Dropboxに接続しました。')
-except dropbox.exceptions.AuthError as e:
-    print(f'⚠️ アクセストークンが無効です。リフレッシュを試みます... {e}')
-    ACCESS_TOKEN = refresh_access_token()
-    dbx = dropbox.Dropbox(ACCESS_TOKEN)
+# ▼ Dropboxクライアントの初期化関数（リフレッシュ込み）
+def init_dropbox_client():
+    access_token = refresh_access_token()
     try:
+        dbx = dropbox.Dropbox(access_token)
         dbx.users_get_current_account()
-        print('✅ Dropboxに再接続しました。')
-    except Exception as e2:
-        print(f'🚫 Dropboxへの再接続に失敗しました: {e2}')
+        print('✅ Dropboxに接続しました。')
+        return dbx
+    except Exception as e:
+        print(f'🚫 Dropbox接続に失敗しました: {e}')
         exit(1)
 
+# ▼ Dropboxクライアントを初期化
+dbx = init_dropbox_client()
 
 # ▼ ファイルダウンロード関数
 def download_csv_from_dropbox(file_name):
