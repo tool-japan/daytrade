@@ -7,7 +7,7 @@ import time
 import requests
 import sys
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, To
+from sendgrid.helpers.mail import Mail, Email, To, Bcc
 
 print(f"📝 Pythonバージョン: {sys.version}")
 
@@ -67,37 +67,32 @@ def format_output_text(df):
 # ▼ ログ送信専用関数（SendGrid使用）
 def send_output_dataframe_via_email(output_data):
     try:
-        # DataFrameの整形
-        output_df = pd.DataFrame(output_data)
-        signal_order = ["順張り買い目", "逆張り買い目", "順張り売り目", "逆張り売り目", "ロングブレイクアウト", "ショートブレイクアウト"]
-        output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_order, ordered=True)
-        output_df = output_df.sort_values(by=["シグナル"], ascending=[True])
+        # DataFrameの整形とテキスト整形（省略）
 
-        # 整形したテキストを作成
-        message_text = format_output_text(output_df)
-
-        # 環境変数から取得
+        # 環境変数の取得
         sendgrid_api_key = os.environ.get("SENDGRID_API_KEY")
         sender_email = os.environ.get("SENDER_EMAIL")
         email_list_path = "email_list.txt"
         email_subject = "【株式テクニカル分析検出通知】"
 
-        # メール送信先を読み込み
+        # 送信先を読み込み（BCC用）
         with open(email_list_path, "r", encoding="utf-8") as f:
-            recipients = [To(email.strip()) for email in f if email.strip()]
+            recipient_emails = [email.strip() for email in f if email.strip()]
 
-        # メール本文とオブジェクト作成
+        # メール作成（To: 自分、BCC: 全体）
         message = Mail(
-            from_email=sender_email,
-            to_emails=recipients,
+            from_email=Email(sender_email),
+            to_emails=To(sender_email),  # ← 自分宛に To
             subject=email_subject,
             plain_text_content=message_text
         )
+        # BCC追加
+        message.bcc = [Bcc(email) for email in recipient_emails]
 
         # 送信
         sg = SendGridAPIClient(sendgrid_api_key)
         response = sg.send(message)
-        print(f"✅ メール送信完了: ステータスコード = {response.status_code}")
+        print(f"✅ メール送信完了（BCCモード）: ステータスコード = {response.status_code}")
 
     except Exception as e:
         print(f"🚫 メール送信エラー: {e}")
