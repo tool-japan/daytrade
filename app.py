@@ -278,7 +278,8 @@ def analyze_and_display_filtered_signals(file_path):
 
             except Exception as e:
                 print(f"データ処理エラー（{code}）: {e}")
-
+    except Exception as e:  # ← ← ← ★ これが抜けていた！
+        print(f"データ読み込みエラー: {e}")
 
 
 # ▼ 出力データから HTML テーブルを生成
