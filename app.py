@@ -11,7 +11,7 @@ from sendgrid.helpers.mail import Mail, Email, To, Bcc
 
 # ▼ テスト実行用に固定日付や時刻を指定できる（空欄ならリアルタイム）
 TEST_DATE = "20250521"  # 例: "20250517"
-TEST_TIMES = [""]  # 例: ["1000", "1010"]
+TEST_TIMES = ["1400"]  # 例: ["1000", "1010"]
 
 
 # ▼ -----RSIの計算-----
@@ -271,21 +271,20 @@ def format_output_text(df):
     ]
     lines = []
 
-    header = "コード   銘柄名       株価     RSI    出来高増加率   板バランス"
-    separator = "-------------------------------------------------------------------------------------------"
+    # ▼ 表のヘッダー（全体で1回だけ）
+    lines.append("コード   銘柄名       株価     RSI    出来高増加率   板バランス")
+    lines.append("-------------------------------------------------------------------------------------------")
+    lines.append("")
 
     for signal in signal_order:
         group = df[df["シグナル"] == signal]
 
-        # ▼ セクション見出し（■■■ ○○（計X銘柄）■■■）
+        # ▼ セクションタイトル
         lines.append(f"■■■ {signal}（計{len(group)}銘柄）■■■")
 
         if group.empty:
             lines.append("シグナルなし")
         else:
-            lines.append(header)
-            lines.append(separator)
-
             for _, row in group.iterrows():
                 code = str(row['銘柄コード'])
                 name = str(row['銘柄名称'])
@@ -298,7 +297,7 @@ def format_output_text(df):
                     f"{code:<6} {name:<12} {price:>6}   {rsi:>5}   {vol:>8}   {board:>5}"
                 )
 
-        lines.append("")  # 空行で区切り
+        lines.append("")  # 区切りの空行
 
     # ▼ 注意文を末尾に追加
     lines.append("""
