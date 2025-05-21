@@ -18,6 +18,10 @@ TEST_TIMES = ["1400"]  # 例: ["1000", "1010"]
 RSI_PERIOD = 26  # RSIの計算期間（例：26本）
 TREND_LOOKBACK = 5  # トレンド判定で使う短期平均の参照期間
 
+# ▼ 設定値
+TREND_STRENGTH_THRESHOLD = 0.01  # 1%以上の上昇幅で加点
+REVERSAL_VOLATILITY_THRESHOLD = 0.015  # 1.5%以上の標準偏差で加点
+
 # ▼ RSI（相対力指数）を計算する関数
 # - 過去の価格から価格変動の平均を使って買われすぎ／売られすぎを評価
 def calculate_rsi(prices, period=RSI_PERIOD):
@@ -32,32 +36,36 @@ def calculate_rsi(prices, period=RSI_PERIOD):
 
 # ▼ スコア重み（順張り・逆張り用）
 TREND_SCORE = {
-    "rsi": 1,  # RSIによる評価スコア
-    "macd_hist": 1,  # MACDヒストグラムによる評価スコア
-    "trend_alignment": 1,  # 短期・長期トレンド整合性による評価
-    "volume_spike": 1 , # 出来高急増による評価
-    "board_balance": 1 #板バランスによる評価
+    "rsi": 1,
+    "macd_hist": 1,
+    "trend_alignment": 1,
+    "volume_spike": 1,
+    "board_balance": 1,
+    "trend_strength": 1  # ← 追加：上昇幅
 }
 REVERSAL_SCORE = {
-    "rsi": 1,  # RSIによる評価スコア
-    "macd_hist": 1,  # MACDヒストグラムによる評価スコア
-    "volume_spike": 1 , # 出来高急増による評価
-    "board_balance": 1
+    "rsi": 1,
+    "macd_hist": 1,
+    "volume_spike": 1,
+    "board_balance": 1,
+    "volatility": 1  # ← 追加：ボラティリティ
 }
 
 # ▼ 順張りの設定値
-TREND_SCORE_THRESHOLD = 5  # 順張りシグナルとして採用するための最小スコア
+TREND_SCORE_THRESHOLD = 6  # 順張りシグナルとして採用するための最小スコア
 RSI_TREND_BUY_THRESHOLD = 40  # RSIがこの値を超えたら順張り買いシグナル
 RSI_TREND_SELL_THRESHOLD = 60  # RSIがこの値を下回ったら順張り売りシグナル
 
-# ▼ 順張りシグナルのスコアを評価する関数（買い・売りを明確に分岐）
+# ▼ 順張りシグナルのスコアを評価する関数
 def analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hist, board_balance):
     buy_score = 0
     sell_score = 0
     short_trend = prices[-TREND_LOOKBACK:].mean()
     long_trend = prices.mean()
 
-    # ▼ 順張り買いの条件（RSIが高い、MACD上向き、トレンド上昇）
+    # 上昇幅の計算
+    trend_strength = (prices[-1] - prices[0]) / prices[0]
+
     if rsi >= RSI_TREND_BUY_THRESHOLD:
         buy_score += TREND_SCORE["rsi"]
     if macd_hist > 0:
@@ -67,9 +75,10 @@ def analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hi
     if volume_spike:
         buy_score += TREND_SCORE["volume_spike"]
     if board_balance > BOARD_BALANCE_BUY_THRESHOLD:
-        buy_score += TREND_SCORE["board_balance"]   
+        buy_score += TREND_SCORE["board_balance"]
+    if trend_strength > TREND_STRENGTH_THRESHOLD:
+        buy_score += TREND_SCORE["trend_strength"]
 
-    # ▼ 順張り売りの条件（RSIが低い、MACD下向き、トレンド下降）
     if rsi <= RSI_TREND_SELL_THRESHOLD:
         sell_score += TREND_SCORE["rsi"]
     if macd_hist < 0:
@@ -81,7 +90,6 @@ def analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hi
     if board_balance < BOARD_BALANCE_SELL_THRESHOLD:
         sell_score += TREND_SCORE["board_balance"]
 
-    # ▼ シグナル判定（スコア条件を満たす場合に出力）
     if buy_score >= TREND_SCORE_THRESHOLD:
         return "買い目-順張り"
     elif sell_score >= TREND_SCORE_THRESHOLD:
@@ -90,16 +98,15 @@ def analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hi
     return None
 
 # ▼ 逆張りの設定値
-REVERSAL_SCORE_THRESHOLD = 4  # 逆張りシグナルとして採用するための最小スコア
+REVERSAL_SCORE_THRESHOLD = 5  # 逆張りシグナルとして採用するための最小スコア
 RSI_BUY_THRESHOLD = 45  # RSIがこの値以下なら逆張り買いシグナル
 RSI_SELL_THRESHOLD = 55  # RSIがこの値以上なら逆張り売りシグナル
 
-# ▼ 逆張りシグナルのスコアを評価する関数（買い／売りを明示）
-def analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance):
+# ▼ 逆張りシグナルのスコアを評価する関数
+def analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance, volatility):
     buy_score = 0
     sell_score = 0
 
-    # ▼ 逆張り買いの評価条件
     if rsi <= RSI_BUY_THRESHOLD:
         buy_score += REVERSAL_SCORE["rsi"]
     if macd_hist > 0:
@@ -107,9 +114,10 @@ def analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance):
     if volume_spike:
         buy_score += REVERSAL_SCORE["volume_spike"]
     if board_balance > BOARD_BALANCE_BUY_THRESHOLD:
-        buy_score += REVERSAL_SCORE["board_balance"]    
+        buy_score += REVERSAL_SCORE["board_balance"]
+    if volatility > REVERSAL_VOLATILITY_THRESHOLD:
+        buy_score += REVERSAL_SCORE["volatility"]
 
-    # ▼ 逆張り売りの評価条件
     if rsi >= RSI_SELL_THRESHOLD:
         sell_score += REVERSAL_SCORE["rsi"]
     if macd_hist < 0:
@@ -118,14 +126,18 @@ def analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance):
         sell_score += REVERSAL_SCORE["volume_spike"]
     if board_balance < BOARD_BALANCE_SELL_THRESHOLD:
         sell_score += REVERSAL_SCORE["board_balance"]
+    if volatility > REVERSAL_VOLATILITY_THRESHOLD:
+        sell_score += REVERSAL_SCORE["volatility"]
 
-    # ▼ スコア判定と出力
     if buy_score >= REVERSAL_SCORE_THRESHOLD:
         return "買い目-逆張り"
     elif sell_score >= REVERSAL_SCORE_THRESHOLD:
         return "売り目-逆張り"
-    
+
     return None
+
+
+
 
 
 # ▼ -----MACDの計算-----
@@ -230,11 +242,14 @@ def analyze_and_display_filtered_signals(file_path):
                 macd_hist = calculate_macd(prices)
 
                 # ▼ シグナルを判定（順張り→逆張りの順で評価）
-                board_balance = calculate_board_balance(row)  # ← 必須
+                board_balance = calculate_board_balance(row)
+                trend_strength = (prices[-1] - prices[0]) / prices[0]
+                volatility = prices.pct_change().std()
 
                 signal = analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hist, board_balance)
                 if not signal:
-                    signal = analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance)
+                    signal = analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance, volatility)
+
 
                 if not signal:
                     continue
