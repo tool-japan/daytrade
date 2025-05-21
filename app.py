@@ -253,6 +253,9 @@ def analyze_and_display_filtered_signals(file_path):
 
                 # ▼ 価格データチェック（G01〜G26）
                 prices = pd.Series(row[price_columns].values.astype(float))
+                
+                print(f"🧪 {code} - 価格データ: {row[price_columns].values}")
+                
                 if len(prices) < 2 or prices.isna().any() or prices.iloc[0] == 0:
                     print(f"⚠ 無効な価格データスキップ: {code} {name}")
                     continue
@@ -287,7 +290,7 @@ def analyze_and_display_filtered_signals(file_path):
                 })
 
             except Exception as e:
-                print(f"データ処理エラー（{code}）: {e}")
+                print(f"データ処理エラー（{code}）: {type(e).__name__} - {e}")
     except Exception as e:  # ← ← ← ★ これが抜けていた！
         print(f"データ読み込みエラー: {e}")
 
@@ -301,18 +304,18 @@ def format_output_html(df):
     ]
 
     html = ["""
-<html><body>
-<style>
-    table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
-    th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
-    th { background-color: #f2f2f2; }
-    h3 { margin-top: 24px; }
-</style>
-<table>
-  <tr>
-    <th>コード</th><th>銘柄名</th><th>株価</th><th>松井証券</th><th>X検索</th>
-  </tr>
-"""]
+            <html><body>
+            <style>
+                table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
+                th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                h3 { margin-top: 24px; }
+            </style>
+            <table>
+            <tr>
+                <th>コード</th><th>銘柄名</th><th>株価</th><th>松井証券</th><th>X検索</th>
+            </tr>"""
+            ]
 
     for signal in signal_order:
         group = df[df["シグナル"] == signal]
@@ -330,51 +333,51 @@ def format_output_html(df):
                 x_url = f"https://x.com/search?q={code}%20{name}&src=typed_query&f=live"
 
                 html.append(f"""<tr>
-<td>{code}</td>
-<td>{name}</td>
-<td>{price}</td>
-<td style='padding-left: 16px;'><a href="{matsui_url}" target="_blank">松井証券</a></td>
-<td style='padding-left: 16px;'><a href="{x_url}" target="_blank">X検索</a></td>
-</tr>""")
+                    <td>{code}</td>
+                    <td>{name}</td>
+                    <td>{price}</td>
+                    <td style='padding-left: 16px;'><a href="{matsui_url}" target="_blank">松井証券</a></td>
+                    <td style='padding-left: 16px;'><a href="{x_url}" target="_blank">X検索</a></td>
+                    </tr>""")
 
-    html.append("</table>")
+                html.append("</table>")
 
-    html.append("""
-<br><br>
-<div style='font-family: sans-serif; font-size: 14px;'>
-<strong>【注意】</strong><br>
-本分析は、特定の銘柄の売買を推奨するものではありません。<br>
-出力内容はあくまでテクニカル分析に基づく参考情報であり、最終的な投資判断はご自身の責任で慎重に行ってください。<br>
-市場動向は常に変動するため、本分析の結果に過信せず、複数の情報を組み合わせた冷静な判断を心がけてください。<br><br>
+                html.append("""
+                    <br><br>
+                    <div style='font-family: sans-serif; font-size: 14px;'>
+                    <strong>【注意】</strong><br>
+                    本分析は、特定の銘柄の売買を推奨するものではありません。<br>
+                    出力内容はあくまでテクニカル分析に基づく参考情報であり、最終的な投資判断はご自身の責任で慎重に行ってください。<br>
+                    市場動向は常に変動するため、本分析の結果に過信せず、複数の情報を組み合わせた冷静な判断を心がけてください。<br><br>
 
-<strong>【シグナルの種類と意味】</strong><br><br>
+                    <strong>【シグナルの種類と意味】</strong><br><br>
 
-    <strong>- 買い目-順張り：</strong><br>
-    株価が上昇トレンドに乗っており、今後も上昇が継続する可能性があると判断された買いのタイミングです。<br>
-    RSIやMACD、トレンド、出来高、板バランスが好調な銘柄が選ばれます。<br><br>
+                        <strong>- 買い目-順張り：</strong><br>
+                        株価が上昇トレンドに乗っており、今後も上昇が継続する可能性があると判断された買いのタイミングです。<br>
+                        RSIやMACD、トレンド、出来高、板バランスが好調な銘柄が選ばれます。<br><br>
 
-    <strong>- 買い目-逆張り：</strong><br>
-    株価が短期的に下落しすぎており、反発上昇が期待される場面での買いシグナルです。<br>
-    RSIが低く、出来高やMACDなどが反転の兆しを見せている銘柄を抽出します。<br><br>
+                        <strong>- 買い目-逆張り：</strong><br>
+                        株価が短期的に下落しすぎており、反発上昇が期待される場面での買いシグナルです。<br>
+                        RSIが低く、出来高やMACDなどが反転の兆しを見せている銘柄を抽出します。<br><br>
 
-    <strong>- 売り目-順張り：</strong><br>
-    株価が下降トレンドに入っており、さらに下落する可能性が高いと判断された売りのシグナルです。<br>
-    各種トレンド指標がネガティブ方向で一致している銘柄が対象です。<br><br>
+                        <strong>- 売り目-順張り：</strong><br>
+                        株価が下降トレンドに入っており、さらに下落する可能性が高いと判断された売りのシグナルです。<br>
+                        各種トレンド指標がネガティブ方向で一致している銘柄が対象です。<br><br>
 
-    <strong>- 売り目-逆張り：</strong><br>
-    株価が短期的に上がりすぎており、下落への転換が近いと考えられる場面での売りシグナルです。<br>
-    RSIが高すぎる銘柄や、過熱感がある銘柄が選ばれます。<br><br>
+                        <strong>- 売り目-逆張り：</strong><br>
+                        株価が短期的に上がりすぎており、下落への転換が近いと考えられる場面での売りシグナルです。<br>
+                        RSIが高すぎる銘柄や、過熱感がある銘柄が選ばれます。<br><br>
 
-    <strong>- 買い目-ブレイクアウト（ロング）：</strong><br>
-    株価が過去の上値抵抗線（前日終値など）を上抜けし、さらに出来高と板バランスも伴って強い上昇が確認されたシグナルです。<br>
-    急騰の初動を捉えるための買いタイミングを示します。<br><br>
+                        <strong>- 買い目-ブレイクアウト（ロング）：</strong><br>
+                        株価が過去の上値抵抗線（前日終値など）を上抜けし、さらに出来高と板バランスも伴って強い上昇が確認されたシグナルです。<br>
+                        急騰の初動を捉えるための買いタイミングを示します。<br><br>
 
-    <strong>- 売り目-ブレイクアウト（ショート）：</strong><br>
-    株価が下値の節目を割り込み、出来高増加や売り優勢の板バランスを伴う場合に検出されるシグナルです。<br>
-    急落の初動や下げトレンドへの転換点を狙った売りの判断材料となります。<br>
-</div>
-</body></html>
-""")
+                        <strong>- 売り目-ブレイクアウト（ショート）：</strong><br>
+                        株価が下値の節目を割り込み、出来高増加や売り優勢の板バランスを伴う場合に検出されるシグナルです。<br>
+                        急落の初動や下げトレンドへの転換点を狙った売りの判断材料となります。<br>
+                    </div>
+                    </body></html>
+                    """)
 
     return "\n".join(html)
 
@@ -411,14 +414,6 @@ def send_output_dataframe_via_email(output_data):
         print(f"✅ HTMLメール送信完了（BCCモード）: ステータスコード = {response.status_code}")
     except Exception as e:
         print(f"🚫 メール送信エラー: {e}")
-
-
-
-        
-# ▼ ボラティリティ（価格変動幅）を計算する関数（将来拡張用）
-VOLATILITY_LOOKBACK = 26  # ボラティリティ評価の期間（将来用途）
-def calculate_volatility(prices):
-    return prices[-VOLATILITY_LOOKBACK:].pct_change().std()
 
 
 # ▼ タイムゾーンを日本時間（JST）に設定
