@@ -19,7 +19,7 @@ RSI_PERIOD = 26  # RSIの計算期間（例：26本）
 TREND_LOOKBACK = 5  # トレンド判定で使う短期平均の参照期間
 
 # ▼ 設定値
-TREND_STRENGTH_THRESHOLD = 0.01  # 1%以上の上昇幅で加点
+TREND_STRENGTH_THRESHOLD = 0.005  # 1%以上の上昇幅で加点
 REVERSAL_VOLATILITY_THRESHOLD = 0.015  # 1.5%以上の標準偏差で加点
 
 # ▼ RSI（相対力指数）を計算する関数
