@@ -293,7 +293,8 @@ def format_output_html(df):
         else:
             for _, row in group.iterrows():
                 code = str(row["銘柄コード"])
-                name = str(row["銘柄名称"])
+                name_full = str(row["銘柄名称"])
+                name = name_full[:8] + "..." if len(name_full) > 8 else name_full
                 price = f"{int(row['株価']):,}円"
                 matsui_url = f"https://finance.matsui.co.jp/stock/{code}/index"
                 x_url = f"https://x.com/search?q={code}%20{name}&src=typed_query&f=live"
@@ -302,8 +303,8 @@ def format_output_html(df):
 <td>{code}</td>
 <td>{name}</td>
 <td>{price}</td>
-<td><a href="{matsui_url}" target="_blank">松井証券</a></td>
-<td><a href="{x_url}" target="_blank">X検索</a></td>
+<td style='padding-left: 16px;'><a href="{matsui_url}" target="_blank">松井証券</a></td>
+<td style='padding-left: 16px;'><a href="{x_url}" target="_blank">X検索</a></td>
 </tr>""")
 
     html.append("</table>")
