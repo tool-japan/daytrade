@@ -11,7 +11,7 @@ from sendgrid.helpers.mail import Mail, Email, To, Bcc
 
 # ▼ テスト実行用に固定日付や時刻を指定できる（空欄ならリアルタイム）
 TEST_DATE = "20250521"  # 例: "20250517"
-TEST_TIMES = []  # 例: ["1000", "1010"]
+TEST_TIMES = [1400]  # 例: ["1000", "1010"]
 
 
 # ▼ -----RSIの計算-----
