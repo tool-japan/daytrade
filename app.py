@@ -11,7 +11,7 @@ from sendgrid.helpers.mail import Mail, Email, To, Bcc
 
 # ▼ テスト実行用に固定日付や時刻を指定できる（空欄ならリアルタイム）
 TEST_DATE = "20250521"  # 例: "20250517"
-TEST_TIMES = [0915]  # 例: ["1000", "1010"]
+TEST_TIMES = ["0915"]  # 例: ["1000", "1010"]
 
 
 # ▼ -----RSIの計算-----
@@ -397,7 +397,7 @@ while True:
     try:
         # 日本時間で日付と時刻を取得
         today_date = TEST_DATE if TEST_DATE else get_japan_time().strftime("%Y%m%d")
-        current_time = f"{TEST_TIMES[0]:04d}" if TEST_TIMES else get_japan_time().strftime("%H%M")
+        current_time = TEST_TIMES[0] if TEST_TIMES else get_japan_time().strftime("%H%M")
         
         # ファイル名を日本時間で生成
         file_name = f"kabuteku{today_date}_{current_time}.csv"
