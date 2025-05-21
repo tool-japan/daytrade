@@ -15,7 +15,7 @@ TEST_TIMES = [""]  # 例: ["1000", "1010"]
 
 
 # ▼ -----RSIの計算-----
-RSI_PERIOD = 26  # RSIの計算期間（例：14本）
+RSI_PERIOD = 26  # RSIの計算期間（例：26本）
 TREND_LOOKBACK = 5  # トレンド判定で使う短期平均の参照期間
 
 # ▼ RSI（相対力指数）を計算する関数
@@ -83,9 +83,9 @@ def analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hi
 
     # ▼ シグナル判定（スコア条件を満たす場合に出力）
     if buy_score >= TREND_SCORE_THRESHOLD:
-        return "順張り買い目"
+        return "買い目-順張り"
     elif sell_score >= TREND_SCORE_THRESHOLD:
-        return "順張り売り目"
+        return "売り目-順張り"
 
     return None
 
@@ -121,9 +121,9 @@ def analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance):
 
     # ▼ スコア判定と出力
     if buy_score >= REVERSAL_SCORE_THRESHOLD:
-        return "逆張り買い目"
+        return "買い目-逆張り"
     elif sell_score >= REVERSAL_SCORE_THRESHOLD:
-        return "逆張り売り目"
+        return "売り目-逆張り"
     
     return None
 
@@ -193,12 +193,12 @@ def detect_breakout(df):
         if current_price > prev_close * (1 + BREAKOUT_THRESHOLD) and low_price < prev_close:
             if all(prices[-BREAKOUT_CONFIRMATION_BARS:] > prev_close * (1 + BREAKOUT_THRESHOLD)):
                 if (volumes[-VOLUME_CONFIRMATION_BARS:].pct_change().dropna() > VOLUME_SPIKE_THRESHOLD).all() and board_balance > BOARD_BALANCE_BUY_THRESHOLD:
-                    breakout_signals.append({"銘柄コード": code, "銘柄名称": name, "シグナル": "ロングブレイクアウト", "株価": current_price})
+                    breakout_signals.append({"銘柄コード": code, "銘柄名称": name, "シグナル": "買い目-ブレイクアウト", "株価": current_price})
 
         if current_price < prev_close * (1 - BREAKOUT_THRESHOLD) and high_price > prev_close:
             if all(prices[-BREAKOUT_CONFIRMATION_BARS:] < prev_close * (1 - BREAKOUT_THRESHOLD)):
                 if (volumes[-VOLUME_CONFIRMATION_BARS:].pct_change().dropna() > VOLUME_SPIKE_THRESHOLD).all() and board_balance < BOARD_BALANCE_SELL_THRESHOLD:
-                    breakout_signals.append({"銘柄コード": code, "銘柄名称": name, "シグナル": "ショートブレイクアウト", "株価": current_price})
+                    breakout_signals.append({"銘柄コード": code, "銘柄名称": name, "シグナル": "売り目-ブレイクアウト", "株価": current_price})
     return breakout_signals
 
 
@@ -264,36 +264,91 @@ def analyze_and_display_filtered_signals(file_path):
 
 # ▼ 出力データをテキスト形式に整形（メール本文用）
 def format_output_text(df):
-    signal_order = ["順張り買い目", "逆張り買い目", "順張り売り目", "逆張り売り目", "ロングブレイクアウト", "ショートブレイクアウト"]
+    signal_order = [
+        "買い目-順張り", "買い目-逆張り",
+        "売り目-順張り", "売り目-逆張り",
+        "買い目-ブレイクアウト", "売り目-ブレイクアウト"
+    ]
     lines = []
+
+    header = "コード   銘柄名       株価     RSI    出来高増加率   板バランス"
+    separator = "-------------------------------------------------------------------------------------------"
 
     for signal in signal_order:
         group = df[df["シグナル"] == signal]
-        lines.append(f"■ {signal}（計{len(group)}銘柄）")
+
+        # ▼ セクション見出し（■■■ ○○（計X銘柄）■■■）
+        lines.append(f"■■■ {signal}（計{len(group)}銘柄）■■■")
 
         if group.empty:
             lines.append("シグナルなし")
         else:
-            lines.append("コード   銘柄名       株価     RSI    出来高増加率   板バランス")
-            lines.append("------------------------------------------------------------")
+            lines.append(header)
+            lines.append(separator)
 
             for _, row in group.iterrows():
                 code = str(row['銘柄コード'])
                 name = str(row['銘柄名称'])
                 price = f"{int(row['株価']):,}円"
                 rsi = f"{row.get('RSI', '–'):.1f}" if pd.notnull(row.get('RSI')) else "–"
-                vol = f"{row.get('出来高増加率', '–'):.1%}" if pd.notnull(row.get('出来高増加率')) else "–"
+                vol = f"{row.get('出来高増加率', '–') * 100:.1f}%" if pd.notnull(row.get('出来高増加率')) else "–"
                 board = f"{row.get('板バランス', '–'):.2f}" if pd.notnull(row.get('板バランス')) else "–"
 
-                lines.append(f"{code:<6} {name:<10} {price:>6}   {rsi:>5}   {vol:>7}   {board:>5}")
+                lines.append(
+                    f"{code:<6} {name:<12} {price:>6}   {rsi:>5}   {vol:>8}   {board:>5}"
+                )
 
-        lines.append("")  # 区切り改行
+        lines.append("")  # 空行で区切り
 
-    # ▼ 投資判断の注意文を末尾に追加
-    lines.append("【ご注意】")
-    lines.append("本分析は、特定の銘柄の売買を推奨するものではありません。")
-    lines.append("出力内容はあくまでテクニカル分析に基づく参考情報であり、最終的な投資判断はご自身の責任で慎重に行ってください。")
-    lines.append("市場動向は常に変動するため、本分析の結果に過信せず、複数の情報を組み合わせた冷静な判断を心がけてください。")
+    # ▼ 注意文を末尾に追加
+    lines.append("""
+      【注意】
+    本分析は、特定の銘柄の売買を推奨するものではありません。
+    出力内容はあくまでテクニカル分析に基づく参考情報であり、最終的な投資判断はご自身の責任で慎重に行ってください。
+    市場動向は常に変動するため、本分析の結果に過信せず、複数の情報を組み合わせた冷静な判断を心がけてください。           
+                 
+    【各指標の説明】
+    - RSI（相対力指数）：
+    株価がどの程度「買われすぎ」「売られすぎ」かを示すテクニカル指標です。
+    価格変動をもとに、上昇幅と下落幅の平均から計算されます。
+    RSIが高いほど買われすぎ、低いほど売られすぎとされます。
+
+    - 出来高増加率：
+    最新の出来高が、過去の出来高と比べてどの程度増加したかを示す割合です。
+    出来高が急増している銘柄は、市場の注目が集まりやすいと考えられます。
+
+    - 板バランス：
+    買い注文と売り注文の量（気配数量）の比率を示します。
+    値が1.0より大きい場合は買いが優勢、1.0未満は売りが優勢と判断されます。
+    
+    【シグナルの種類と意味】
+
+    - 買い目-順張り：
+    株価が上昇トレンドに乗っており、今後も上昇が継続する可能性があると判断された買いのタイミングです。
+    RSIやMACD、トレンド、出来高、板バランスが好調な銘柄が選ばれます。
+
+    - 買い目-逆張り：
+    株価が短期的に下落しすぎており、反発上昇が期待される場面での買いシグナルです。
+    RSIが低く、出来高やMACDなどが反転の兆しを見せている銘柄を抽出します。
+
+    - 売り目-順張り：
+    株価が下降トレンドに入っており、さらに下落する可能性が高いと判断された売りのシグナルです。
+    各種トレンド指標がネガティブ方向で一致している銘柄が対象です。
+
+    - 売り目-逆張り：
+    株価が短期的に上がりすぎており、下落への転換が近いと考えられる場面での売りシグナルです。
+    RSIが高すぎる銘柄や、過熱感がある銘柄が選ばれます。
+
+    - 買い目-ブレイクアウト（ロング）：
+    株価が過去の上値抵抗線（前日終値など）を上抜けし、さらに出来高と板バランスも伴って強い上昇が確認されたシグナルです。
+    急騰の初動を捉えるための買いタイミングを示します。
+
+    - 売り目-ブレイクアウト（ショート）：
+    株価が下値の節目を割り込み、出来高増加や売り優勢の板バランスを伴う場合に検出されるシグナルです。
+    急落の初動や下げトレンドへの転換点を狙った売りの判断材料となります。
+
+    """)
+    
 
     return "\n".join(lines)
 
@@ -302,7 +357,7 @@ def format_output_text(df):
 def send_output_dataframe_via_email(output_data):
     try:
         output_df = pd.DataFrame(output_data)
-        signal_order = ["順張り買い目", "逆張り買い目", "順張り売り目", "逆張り売り目", "ロングブレイクアウト", "ショートブレイクアウト"]
+        signal_order = ["買い目-順張り", "買い目-逆張り", "売り目-順張り", "売り目-逆張り", "買い目-ブレイクアウト", "売り目-ブレイクアウト"]
         output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_order, ordered=True)
         output_df = output_df.sort_values(by=["シグナル"], ascending=[True])
 
@@ -311,7 +366,8 @@ def send_output_dataframe_via_email(output_data):
         sendgrid_api_key = os.environ.get("SENDGRID_API_KEY")
         sender_email = os.environ.get("SENDER_EMAIL")
         email_list_path = "email_list.txt"
-        email_subject = f"【{current_time}】株式 - デイトレ - テクニカル分析 - シグナル通知"
+        formatted_time = f"{current_time[:2]}:{current_time[2:]}"
+        email_subject = f"【{formatted_time}】株式 - デイトレ - テクニカル分析 - シグナル通知"
 
         with open(email_list_path, "r", encoding="utf-8") as f:
             recipient_emails = [email.strip() for email in f if email.strip()]
