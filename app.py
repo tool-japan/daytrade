@@ -271,15 +271,15 @@ def format_output_html(df):
     ]
 
     html = ["""
-<html><body>
-<style>
-    table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
-    th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
-    th { background-color: #f2f2f2; }
-    h3 { margin-top: 24px; }
-</style>
-<table>
-"""]
+                <html><body>
+                <style>
+                    table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
+                    th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+                    th { background-color: #f2f2f2; }
+                    h3 { margin-top: 24px; }
+                </style>
+                <table>
+                """]
 
     for signal in signal_order:
         group = df[df["シグナル"] == signal]
@@ -298,51 +298,52 @@ def format_output_html(df):
                 x_url = f"https://x.com/search?q={code}%20{name}&src=typed_query&f=live"
 
                 html.append(f"""<tr>
-<td>{code}</td>
-<td>{name}</td>
-<td>{price}</td>
-<td style='padding-left: 16px;'><a href="{matsui_url}" target="_blank">松井証券</a></td>
-<td style='padding-left: 16px;'><a href="{x_url}" target="_blank">X検索</a></td>
-</tr>""")
+                                <td>{code}</td>
+                                <td>{name}</td>
+                                <td>{price}</td>
+                                <td style='padding-left: 16px;'><a href="{matsui_url}" target="_blank">松井証券</a></td>
+                                <td style='padding-left: 16px;'><a href="{x_url}" target="_blank">X検索</a></td>
+                                </tr>""")
 
     html.append("</table>")
 
     html.append("""
-<br><br>
-<div style='font-family: sans-serif; font-size: 14px;'>
-<strong>【注意】</strong><br>
-本分析は、特定の銘柄の売買を推奨するものではありません。<br>
-出力内容はあくまでテクニカル分析に基づく参考情報であり、最終的な投資判断はご自身の責任で慎重に行ってください。<br>
-市場動向は常に変動するため、本分析の結果に過信せず、複数の情報を組み合わせた冷静な判断を心がけてください。<br><br>
+                    <br><br>
+                    <div style='font-family: sans-serif; font-size: 14px;'>
+                        <strong><span style="color:red;">【注意】</span></strong><br>
+                        <span style="color:red;">
+                        本分析は、特定の銘柄の売買を推奨するものではありません。<br>
+                        出力内容はあくまでテクニカル分析に基づく参考情報であり、最終的な投資判断はご自身の責任で慎重に行ってください。<br>
+                        市場動向は常に変動するため、本分析の結果に過信せず、複数の情報を組み合わせた冷静な判断を心がけてください。
+                        </span><br><br>
 
-<strong>【シグナルの種類と意味】</strong><br><br>
+                        <strong>【シグナルの種類と意味】</strong><br>
+                        <strong>- 買い目-順張り：</strong><br>
+                        株価が上昇トレンドに乗っており、今後も上昇が継続する可能性があると判断された買いシグナルです。<br>
+                        RSIやMACD、トレンド、出来高、板バランスが好調な銘柄が選ばれます。<br><br>
 
-    <strong>- 買い目-順張り：</strong><br>
-    株価が上昇トレンドに乗っており、今後も上昇が継続する可能性があると判断された買いのタイミングです。<br>
-    RSIやMACD、トレンド、出来高、板バランスが好調な銘柄が選ばれます。<br><br>
+                        <strong>- 買い目-逆張り：</strong><br>
+                        株価が短期的に下落しすぎており、反発上昇が期待される場面での買いシグナルです。<br>
+                        RSIが低く、出来高やMACDなどが反転の兆しを見せている銘柄を抽出します。<br><br>
 
-    <strong>- 買い目-逆張り：</strong><br>
-    株価が短期的に下落しすぎており、反発上昇が期待される場面での買いシグナルです。<br>
-    RSIが低く、出来高やMACDなどが反転の兆しを見せている銘柄を抽出します。<br><br>
+                        <strong>- 売り目-順張り：</strong><br>
+                        株価が下降トレンドに入っており、さらに下落する可能性が高いと判断された売りのシグナルです。<br>
+                        各種トレンド指標がネガティブ方向で一致している銘柄が対象です。<br><br>
 
-    <strong>- 売り目-順張り：</strong><br>
-    株価が下降トレンドに入っており、さらに下落する可能性が高いと判断された売りのシグナルです。<br>
-    各種トレンド指標がネガティブ方向で一致している銘柄が対象です。<br><br>
+                        <strong>- 売り目-逆張り：</strong><br>
+                        株価が短期的に上がりすぎており、下落への転換が近いと考えられる場面での売りシグナルです。<br>
+                        RSIが高すぎる銘柄や、過熱感がある銘柄が選ばれます。<br><br>
 
-    <strong>- 売り目-逆張り：</strong><br>
-    株価が短期的に上がりすぎており、下落への転換が近いと考えられる場面での売りシグナルです。<br>
-    RSIが高すぎる銘柄や、過熱感がある銘柄が選ばれます。<br><br>
+                        <strong>- 買い目-ブレイクアウト：</strong><br>
+                        株価が過去の上値抵抗線（前日終値など）を上抜けし、さらに出来高と板バランスも伴って強い上昇が確認されたシグナルです。<br>
+                        急騰の初動を捉えるための買いタイミングを示します。<br><br>
 
-    <strong>- 買い目-ブレイクアウト（ロング）：</strong><br>
-    株価が過去の上値抵抗線（前日終値など）を上抜けし、さらに出来高と板バランスも伴って強い上昇が確認されたシグナルです。<br>
-    急騰の初動を捉えるための買いタイミングを示します。<br><br>
-
-    <strong>- 売り目-ブレイクアウト（ショート）：</strong><br>
-    株価が下値の節目を割り込み、出来高増加や売り優勢の板バランスを伴う場合に検出されるシグナルです。<br>
-    急落の初動や下げトレンドへの転換点を狙った売りの判断材料となります。<br>
-</div>
-</body></html>
-""")
+                        <strong>- 売り目-ブレイクアウト：</strong><br>
+                        株価が下値の節目を割り込み、出来高増加や売り優勢の板バランスを伴う場合に検出されるシグナルです。<br>
+                        急落の初動や下げトレンドへの転換点を狙った売りの判断材料となります。<br>
+                    </div>
+                    </body></html>
+                    """)
 
     return "\n".join(html)
 
