@@ -259,19 +259,27 @@ def analyze_and_display_filtered_signals(file_path):
 
 # ▼ 出力データをテキスト形式に整形（メール本文用）
 def format_output_text(df):
-    grouped = df.groupby("シグナル", observed=False)
+    signal_order = ["順張り買い目", "逆張り買い目", "順張り売り目", "逆張り売り目", "ロングブレイクアウト", "ショートブレイクアウト"]
     lines = []
-    for signal, group in grouped:
+
+    for signal in signal_order:
+        group = df[df["シグナル"] == signal]
         lines.append(f"■ {signal}")
-        for _, row in group.iterrows():
-            lines.append(f"{row['銘柄コード']} {row['銘柄名称']} 株価: {int(row['株価'])}円")
+        if group.empty:
+            lines.append("シグナルなし")
+        else:
+            for _, row in group.iterrows():
+                lines.append(f"{row['銘柄コード']} {row['銘柄名称']} 株価: {int(row['株価'])}円")
         lines.append("")
+
     # ▼ 投資判断の注意文を末尾に追加
     lines.append("【ご注意】")
     lines.append("本分析は、特定の銘柄の売買を推奨するものではありません。")
     lines.append("出力内容はあくまでテクニカル分析に基づく参考情報であり、最終的な投資判断はご自身の責任で慎重に行ってください。")
     lines.append("市場動向は常に変動するため、本分析の結果に過信せず、複数の情報を組み合わせた冷静な判断を心がけてください。")
+
     return "\n".join(lines)
+
 
 # ▼ SendGridを使って分析結果をメール送信（BCCモード）
 def send_output_dataframe_via_email(output_data):
@@ -286,7 +294,7 @@ def send_output_dataframe_via_email(output_data):
         sendgrid_api_key = os.environ.get("SENDGRID_API_KEY")
         sender_email = os.environ.get("SENDER_EMAIL")
         email_list_path = "email_list.txt"
-        email_subject = "【株式テクニカル分析検出通知】"
+        email_subject = f"【{current_time}】株式 - デイトレ - テクニカル分析 - シグナル通知"
 
         with open(email_list_path, "r", encoding="utf-8") as f:
             recipient_emails = [email.strip() for email in f if email.strip()]
