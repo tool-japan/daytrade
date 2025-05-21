@@ -244,8 +244,13 @@ def analyze_and_display_filtered_signals(file_path):
                     "銘柄コード": code,
                     "銘柄名称": name,
                     "シグナル": signal,
-                    "株価": current_price
+                    "株価": current_price,
+                    "RSI": round(rsi, 1) if not pd.isna(rsi) else None,
+                    "MACDヒストグラム": round(macd_hist, 2),
+                    "出来高増加率": round(row.get("出来高増加率", 0), 4),
+                    "板バランス": round(board_balance, 2)
                 })
+
 
             except Exception as e:
                 print(f"データ処理エラー（{code}）: {e}")
@@ -264,13 +269,25 @@ def format_output_text(df):
 
     for signal in signal_order:
         group = df[df["シグナル"] == signal]
-        lines.append(f"■ {signal}")
+        lines.append(f"■ {signal}（計{len(group)}銘柄）")
+
         if group.empty:
             lines.append("シグナルなし")
         else:
+            lines.append("コード   銘柄名       株価     RSI    出来高増加率   板バランス")
+            lines.append("------------------------------------------------------------")
+
             for _, row in group.iterrows():
-                lines.append(f"{row['銘柄コード']} {row['銘柄名称']} 株価: {int(row['株価'])}円")
-        lines.append("")
+                code = str(row['銘柄コード'])
+                name = str(row['銘柄名称'])
+                price = f"{int(row['株価']):,}円"
+                rsi = f"{row.get('RSI', '–'):.1f}" if pd.notnull(row.get('RSI')) else "–"
+                vol = f"{row.get('出来高増加率', '–'):.1%}" if pd.notnull(row.get('出来高増加率')) else "–"
+                board = f"{row.get('板バランス', '–'):.2f}" if pd.notnull(row.get('板バランス')) else "–"
+
+                lines.append(f"{code:<6} {name:<10} {price:>6}   {rsi:>5}   {vol:>7}   {board:>5}")
+
+        lines.append("")  # 区切り改行
 
     # ▼ 投資判断の注意文を末尾に追加
     lines.append("【ご注意】")
@@ -311,6 +328,7 @@ def send_output_dataframe_via_email(output_data):
         print(f"✅ メール送信完了（BCCモード）: ステータスコード = {response.status_code}")
     except Exception as e:
         print(f"🚫 メール送信エラー: {e}")
+
 
 
         
