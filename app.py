@@ -280,7 +280,7 @@ def format_output_text(df):
         group = df[df["シグナル"] == signal]
 
         # ▼ セクションタイトル
-        lines.append(f"■■■ {signal}（計{len(group)}銘柄）■■■")
+        lines.append(f"■■■ {signal}")
 
         if group.empty:
             lines.append("シグナルなし")
