@@ -18,10 +18,6 @@ TEST_TIMES = ["1400"]  # 例: ["1000", "1010"]
 RSI_PERIOD = 26  # RSIの計算期間（例：26本）
 TREND_LOOKBACK = 5  # トレンド判定で使う短期平均の参照期間
 
-# ▼ 設定値
-TREND_STRENGTH_THRESHOLD = 0.01  # 1%以上の上昇幅で加点
-REVERSAL_VOLATILITY_THRESHOLD = 0.015  # 1.5%以上の標準偏差で加点
-
 # ▼ RSI（相対力指数）を計算する関数
 # - 過去の価格から価格変動の平均を使って買われすぎ／売られすぎを評価
 def calculate_rsi(prices, period=RSI_PERIOD):
@@ -36,36 +32,32 @@ def calculate_rsi(prices, period=RSI_PERIOD):
 
 # ▼ スコア重み（順張り・逆張り用）
 TREND_SCORE = {
-    "rsi": 1,
-    "macd_hist": 1,
-    "trend_alignment": 1,
-    "volume_spike": 1,
-    "board_balance": 1,
-    "trend_strength": 1  # ← 追加：上昇幅
+    "rsi": 1,  # RSIによる評価スコア
+    "macd_hist": 1,  # MACDヒストグラムによる評価スコア
+    "trend_alignment": 1,  # 短期・長期トレンド整合性による評価
+    "volume_spike": 1 , # 出来高急増による評価
+    "board_balance": 1 #板バランスによる評価
 }
 REVERSAL_SCORE = {
-    "rsi": 1,
-    "macd_hist": 1,
-    "volume_spike": 1,
-    "board_balance": 1,
-    "volatility": 1  # ← 追加：ボラティリティ
+    "rsi": 1,  # RSIによる評価スコア
+    "macd_hist": 1,  # MACDヒストグラムによる評価スコア
+    "volume_spike": 1 , # 出来高急増による評価
+    "board_balance": 1
 }
 
 # ▼ 順張りの設定値
-TREND_SCORE_THRESHOLD = 6  # 順張りシグナルとして採用するための最小スコア
+TREND_SCORE_THRESHOLD = 5  # 順張りシグナルとして採用するための最小スコア
 RSI_TREND_BUY_THRESHOLD = 40  # RSIがこの値を超えたら順張り買いシグナル
 RSI_TREND_SELL_THRESHOLD = 60  # RSIがこの値を下回ったら順張り売りシグナル
 
-# ▼ 順張りシグナルのスコアを評価する関数
+# ▼ 順張りシグナルのスコアを評価する関数（買い・売りを明確に分岐）
 def analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hist, board_balance):
     buy_score = 0
     sell_score = 0
     short_trend = prices[-TREND_LOOKBACK:].mean()
     long_trend = prices.mean()
 
-    # 上昇幅の計算
-    trend_strength = (prices[-1] - prices[0]) / prices[0]
-
+    # ▼ 順張り買いの条件（RSIが高い、MACD上向き、トレンド上昇）
     if rsi >= RSI_TREND_BUY_THRESHOLD:
         buy_score += TREND_SCORE["rsi"]
     if macd_hist > 0:
@@ -75,10 +67,9 @@ def analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hi
     if volume_spike:
         buy_score += TREND_SCORE["volume_spike"]
     if board_balance > BOARD_BALANCE_BUY_THRESHOLD:
-        buy_score += TREND_SCORE["board_balance"]
-    if trend_strength > TREND_STRENGTH_THRESHOLD:
-        buy_score += TREND_SCORE["trend_strength"]
+        buy_score += TREND_SCORE["board_balance"]   
 
+    # ▼ 順張り売りの条件（RSIが低い、MACD下向き、トレンド下降）
     if rsi <= RSI_TREND_SELL_THRESHOLD:
         sell_score += TREND_SCORE["rsi"]
     if macd_hist < 0:
@@ -90,6 +81,7 @@ def analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hi
     if board_balance < BOARD_BALANCE_SELL_THRESHOLD:
         sell_score += TREND_SCORE["board_balance"]
 
+    # ▼ シグナル判定（スコア条件を満たす場合に出力）
     if buy_score >= TREND_SCORE_THRESHOLD:
         return "買い目-順張り"
     elif sell_score >= TREND_SCORE_THRESHOLD:
@@ -98,15 +90,16 @@ def analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hi
     return None
 
 # ▼ 逆張りの設定値
-REVERSAL_SCORE_THRESHOLD = 5  # 逆張りシグナルとして採用するための最小スコア
+REVERSAL_SCORE_THRESHOLD = 4  # 逆張りシグナルとして採用するための最小スコア
 RSI_BUY_THRESHOLD = 45  # RSIがこの値以下なら逆張り買いシグナル
 RSI_SELL_THRESHOLD = 55  # RSIがこの値以上なら逆張り売りシグナル
 
-# ▼ 逆張りシグナルのスコアを評価する関数
-def analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance, volatility):
+# ▼ 逆張りシグナルのスコアを評価する関数（買い／売りを明示）
+def analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance):
     buy_score = 0
     sell_score = 0
 
+    # ▼ 逆張り買いの評価条件
     if rsi <= RSI_BUY_THRESHOLD:
         buy_score += REVERSAL_SCORE["rsi"]
     if macd_hist > 0:
@@ -114,10 +107,9 @@ def analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance, volati
     if volume_spike:
         buy_score += REVERSAL_SCORE["volume_spike"]
     if board_balance > BOARD_BALANCE_BUY_THRESHOLD:
-        buy_score += REVERSAL_SCORE["board_balance"]
-    if volatility > REVERSAL_VOLATILITY_THRESHOLD:
-        buy_score += REVERSAL_SCORE["volatility"]
+        buy_score += REVERSAL_SCORE["board_balance"]    
 
+    # ▼ 逆張り売りの評価条件
     if rsi >= RSI_SELL_THRESHOLD:
         sell_score += REVERSAL_SCORE["rsi"]
     if macd_hist < 0:
@@ -126,18 +118,14 @@ def analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance, volati
         sell_score += REVERSAL_SCORE["volume_spike"]
     if board_balance < BOARD_BALANCE_SELL_THRESHOLD:
         sell_score += REVERSAL_SCORE["board_balance"]
-    if volatility > REVERSAL_VOLATILITY_THRESHOLD:
-        sell_score += REVERSAL_SCORE["volatility"]
 
+    # ▼ スコア判定と出力
     if buy_score >= REVERSAL_SCORE_THRESHOLD:
         return "買い目-逆張り"
     elif sell_score >= REVERSAL_SCORE_THRESHOLD:
         return "売り目-逆張り"
 
     return None
-
-
-
 
 
 # ▼ -----MACDの計算-----
@@ -220,15 +208,12 @@ def analyze_and_display_filtered_signals(file_path):
         df = pd.read_csv(file_path)
         df.columns = df.columns.str.strip().str.replace("　", "").str.replace(" ", "")
 
-        print("📊 データ冒頭の数行:\n", df.head())
-        print("📌 カラム一覧:", df.columns.tolist())
-
         # ▼ 出来高スパイク検出とブレイクアウトシグナル取得
         df = calculate_volume_spike(df)
         breakout_signals = detect_breakout(df)
 
         # ▼ 価格列の抽出（例：G01〜G26）
-        price_columns = [f"G{i:02d}" for i in range(1, 27)]
+        price_columns = df.columns[31:57]
 
         # ▼ 全銘柄を対象に分析（価格フィルタは削除）
         output_data = breakout_signals
@@ -236,53 +221,25 @@ def analyze_and_display_filtered_signals(file_path):
             try:
                 code = row["銘柄コード"]
                 name = row["銘柄名称"]
-
-                # ▼ 現在値チェック
-                try:
-                    current_price = float(row["現在値"])
-                except Exception as e:
-                    print(f"⚠ 現在値が不正のためスキップ: {code} {name} - {e}")
-                    continue
-                if current_price <= 0:
-                    print(f"⚠ 現在値が0以下のためスキップ: {code} {name}")
-                    continue
-
-                # ▼ 価格データチェック（G01〜G26） 安全にfloat変換
-                prices_raw = row[price_columns]
-                prices = pd.to_numeric(prices_raw, errors="coerce")
-
-                print(f"🧪 {code} - 価格データ（NaN含む）: {prices.values}")
-
-                # 無効なデータスキップ条件
-                if prices.isna().any():
-                    print(f"⚠ NaNを含む価格データのためスキップ: {code} {name}")
-                    continue
-                if len(prices) < 2 or prices.iloc[0] <= 0:
-                    print(f"⚠ 無効な価格データ（初値が0以下）スキップ: {code} {name}")
-                    continue
-
-                # ▼ 出来高スパイクなどの指標
+                prices = pd.Series(row[price_columns].values.astype(float))
+                current_price = float(row["現在値"])
                 volume_spike = row["急増フラグ"]
+
+                # ▼ RSI & MACDヒストグラムを計算
                 rsi = calculate_rsi(prices, period=RSI_PERIOD)
                 macd_hist = calculate_macd(prices)
-                board_balance = calculate_board_balance(row)
 
-                try:
-                    trend_strength = (prices.iloc[-1] - prices.iloc[0]) / prices.iloc[0]
-                except ZeroDivisionError:
-                    trend_strength = 0
+                # ▼ シグナルを判定（順張り→逆張りの順で評価）
+                board_balance = calculate_board_balance(row)  # ← 必須
 
-                volatility = prices.pct_change().std()
-
-                # ▼ シグナル判定（順張り→逆張り）
                 signal = analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hist, board_balance)
                 if not signal:
-                    signal = analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance, volatility)
+                    signal = analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance)
 
                 if not signal:
                     continue
 
-                # ▼ 出力データ追加
+                # ▼ 出力データに追加
                 output_data.append({
                     "銘柄コード": code,
                     "銘柄名称": name,
@@ -294,12 +251,15 @@ def analyze_and_display_filtered_signals(file_path):
                     "板バランス": round(board_balance, 2)
                 })
 
+
             except Exception as e:
-                print(f"データ処理エラー（{code}）: {type(e).__name__} - {e}")
+                print(f"データ処理エラー（{code}）: {e}")
+
+        # ▼ 結果をメール送信
+        send_output_dataframe_via_email(output_data)
 
     except Exception as e:
         print(f"データ読み込みエラー: {e}")
-
 
 
 # ▼ 出力データから HTML テーブルを生成
@@ -311,18 +271,18 @@ def format_output_html(df):
     ]
 
     html = ["""
-            <html><body>
-            <style>
-                table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
-                th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
-                th { background-color: #f2f2f2; }
-                h3 { margin-top: 24px; }
-            </style>
-            <table>
-            <tr>
-                <th>コード</th><th>銘柄名</th><th>株価</th><th>松井証券</th><th>X検索</th>
-            </tr>"""
-            ]
+<html><body>
+<style>
+    table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
+    th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    h3 { margin-top: 24px; }
+</style>
+<table>
+  <tr>
+    <th>コード</th><th>銘柄名</th><th>株価</th><th>松井証券</th><th>X検索</th>
+  </tr>
+"""]
 
     for signal in signal_order:
         group = df[df["シグナル"] == signal]
@@ -333,6 +293,7 @@ def format_output_html(df):
         else:
             for _, row in group.iterrows():
                 code = str(row["銘柄コード"])
+                name = str(row["銘柄名称"])
                 name_full = str(row["銘柄名称"])
                 name = name_full[:8] + "..." if len(name_full) > 8 else name_full
                 price = f"{int(row['株価']):,}円"
@@ -340,51 +301,53 @@ def format_output_html(df):
                 x_url = f"https://x.com/search?q={code}%20{name}&src=typed_query&f=live"
 
                 html.append(f"""<tr>
-                    <td>{code}</td>
-                    <td>{name}</td>
-                    <td>{price}</td>
-                    <td style='padding-left: 16px;'><a href="{matsui_url}" target="_blank">松井証券</a></td>
-                    <td style='padding-left: 16px;'><a href="{x_url}" target="_blank">X検索</a></td>
-                    </tr>""")
+<td>{code}</td>
+<td>{name}</td>
+<td>{price}</td>
+<td><a href="{matsui_url}" target="_blank">松井証券</a></td>
+<td><a href="{x_url}" target="_blank">X検索</a></td>
+<td style='padding-left: 16px;'><a href="{matsui_url}" target="_blank">松井証券</a></td>
+<td style='padding-left: 16px;'><a href="{x_url}" target="_blank">X検索</a></td>
+</tr>""")
 
-                html.append("</table>")
+    html.append("</table>")
 
-                html.append("""
-                    <br><br>
-                    <div style='font-family: sans-serif; font-size: 14px;'>
-                    <strong>【注意】</strong><br>
-                    本分析は、特定の銘柄の売買を推奨するものではありません。<br>
-                    出力内容はあくまでテクニカル分析に基づく参考情報であり、最終的な投資判断はご自身の責任で慎重に行ってください。<br>
-                    市場動向は常に変動するため、本分析の結果に過信せず、複数の情報を組み合わせた冷静な判断を心がけてください。<br><br>
+    html.append("""
+<br><br>
+<div style='font-family: sans-serif; font-size: 14px;'>
+<strong>【注意】</strong><br>
+本分析は、特定の銘柄の売買を推奨するものではありません。<br>
+出力内容はあくまでテクニカル分析に基づく参考情報であり、最終的な投資判断はご自身の責任で慎重に行ってください。<br>
+市場動向は常に変動するため、本分析の結果に過信せず、複数の情報を組み合わせた冷静な判断を心がけてください。<br><br>
 
-                    <strong>【シグナルの種類と意味】</strong><br><br>
+<strong>【シグナルの種類と意味】</strong><br><br>
 
-                        <strong>- 買い目-順張り：</strong><br>
-                        株価が上昇トレンドに乗っており、今後も上昇が継続する可能性があると判断された買いのタイミングです。<br>
-                        RSIやMACD、トレンド、出来高、板バランスが好調な銘柄が選ばれます。<br><br>
+    <strong>- 買い目-順張り：</strong><br>
+    株価が上昇トレンドに乗っており、今後も上昇が継続する可能性があると判断された買いのタイミングです。<br>
+    RSIやMACD、トレンド、出来高、板バランスが好調な銘柄が選ばれます。<br><br>
 
-                        <strong>- 買い目-逆張り：</strong><br>
-                        株価が短期的に下落しすぎており、反発上昇が期待される場面での買いシグナルです。<br>
-                        RSIが低く、出来高やMACDなどが反転の兆しを見せている銘柄を抽出します。<br><br>
+    <strong>- 買い目-逆張り：</strong><br>
+    株価が短期的に下落しすぎており、反発上昇が期待される場面での買いシグナルです。<br>
+    RSIが低く、出来高やMACDなどが反転の兆しを見せている銘柄を抽出します。<br><br>
 
-                        <strong>- 売り目-順張り：</strong><br>
-                        株価が下降トレンドに入っており、さらに下落する可能性が高いと判断された売りのシグナルです。<br>
-                        各種トレンド指標がネガティブ方向で一致している銘柄が対象です。<br><br>
+    <strong>- 売り目-順張り：</strong><br>
+    株価が下降トレンドに入っており、さらに下落する可能性が高いと判断された売りのシグナルです。<br>
+    各種トレンド指標がネガティブ方向で一致している銘柄が対象です。<br><br>
 
-                        <strong>- 売り目-逆張り：</strong><br>
-                        株価が短期的に上がりすぎており、下落への転換が近いと考えられる場面での売りシグナルです。<br>
-                        RSIが高すぎる銘柄や、過熱感がある銘柄が選ばれます。<br><br>
+    <strong>- 売り目-逆張り：</strong><br>
+    株価が短期的に上がりすぎており、下落への転換が近いと考えられる場面での売りシグナルです。<br>
+    RSIが高すぎる銘柄や、過熱感がある銘柄が選ばれます。<br><br>
 
-                        <strong>- 買い目-ブレイクアウト（ロング）：</strong><br>
-                        株価が過去の上値抵抗線（前日終値など）を上抜けし、さらに出来高と板バランスも伴って強い上昇が確認されたシグナルです。<br>
-                        急騰の初動を捉えるための買いタイミングを示します。<br><br>
+    <strong>- 買い目-ブレイクアウト（ロング）：</strong><br>
+    株価が過去の上値抵抗線（前日終値など）を上抜けし、さらに出来高と板バランスも伴って強い上昇が確認されたシグナルです。<br>
+    急騰の初動を捉えるための買いタイミングを示します。<br><br>
 
-                        <strong>- 売り目-ブレイクアウト（ショート）：</strong><br>
-                        株価が下値の節目を割り込み、出来高増加や売り優勢の板バランスを伴う場合に検出されるシグナルです。<br>
-                        急落の初動や下げトレンドへの転換点を狙った売りの判断材料となります。<br>
-                    </div>
-                    </body></html>
-                    """)
+    <strong>- 売り目-ブレイクアウト（ショート）：</strong><br>
+    株価が下値の節目を割り込み、出来高増加や売り優勢の板バランスを伴う場合に検出されるシグナルです。<br>
+    急落の初動や下げトレンドへの転換点を狙った売りの判断材料となります。<br>
+</div>
+</body></html>
+""")
 
     return "\n".join(html)
 
@@ -421,6 +384,14 @@ def send_output_dataframe_via_email(output_data):
         print(f"✅ HTMLメール送信完了（BCCモード）: ステータスコード = {response.status_code}")
     except Exception as e:
         print(f"🚫 メール送信エラー: {e}")
+
+
+
+
+# ▼ ボラティリティ（価格変動幅）を計算する関数（将来拡張用）
+VOLATILITY_LOOKBACK = 26  # ボラティリティ評価の期間（将来用途）
+def calculate_volatility(prices):
+    return prices[-VOLATILITY_LOOKBACK:].pct_change().std()
 
 
 # ▼ タイムゾーンを日本時間（JST）に設定
@@ -509,11 +480,11 @@ while True:
         # 日本時間で日付と時刻を取得
         today_date = TEST_DATE if TEST_DATE else get_japan_time().strftime("%Y%m%d")
         current_time = TEST_TIMES[0] if TEST_TIMES else get_japan_time().strftime("%H%M")
-        
+
         # ファイル名を日本時間で生成
         file_name = f"kabuteku{today_date}_{current_time}.csv"
         print(f"📂 処理対象ファイル: {file_name}")
-        
+
         # ファイルをダウンロードして分析
         file_path = download_csv_from_dropbox(file_name)
         if file_path:
@@ -521,7 +492,7 @@ while True:
             analyze_and_display_filtered_signals(file_path)
         else:
             print(f"🚫 ファイルが見つかりません: {file_name}")
-        
+
         # 同じ時刻に複数回処理しないように1分待機
         print("⏲️ 1分間待機中...")
         time.sleep(60)
