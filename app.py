@@ -272,25 +272,32 @@ def analyze_and_display_filtered_signals(file_path):
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)      
 
-import os
-import requests
-import dropbox
+# ▼ リフレッシュ間隔（3時間）
+REFRESH_INTERVAL = timedelta(hours=0.1)
 
-# ▼ 環境変数から認証情報を取得
-CLIENT_ID = os.environ.get('DROPBOX_CLIENT_ID')
-CLIENT_SECRET = os.environ.get('DROPBOX_CLIENT_SECRET')
-REFRESH_TOKEN = os.environ.get('DROPBOX_REFRESH_TOKEN')
+# ▼ グローバル状態を保持
+dbx = None
+last_refresh_time = None
 
 # ▼ アクセストークンをリフレッシュする関数
 def refresh_access_token():
+    client_id = os.environ.get('DROPBOX_CLIENT_ID')
+    client_secret = os.environ.get('DROPBOX_CLIENT_SECRET')
+    refresh_token = os.environ.get('DROPBOX_REFRESH_TOKEN')
+
+    if not all([client_id, client_secret, refresh_token]):
+        print("🚫 認証情報が不足しています。環境変数を確認してください。")
+        exit(1)
+
     url = 'https://api.dropbox.com/oauth2/token'
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
     data = {
         'grant_type': 'refresh_token',
-        'client_id': CLIENT_ID,
-        'client_secret': CLIENT_SECRET,
-        'refresh_token': REFRESH_TOKEN
+        'client_id': client_id,
+        'client_secret': client_secret,
+        'refresh_token': refresh_token
     }
+
     try:
         response = requests.post(url, headers=headers, data=data)
         response.raise_for_status()
@@ -301,24 +308,28 @@ def refresh_access_token():
         print(f'🚫 アクセストークンのリフレッシュに失敗しました: {e}')
         exit(1)
 
-# ▼ Dropboxクライアントの初期化関数（リフレッシュ込み）
-def init_dropbox_client():
-    access_token = refresh_access_token()
-    try:
-        dbx = dropbox.Dropbox(access_token)
-        dbx.users_get_current_account()
-        print('✅ Dropboxに接続しました。')
-        return dbx
-    except Exception as e:
-        print(f'🚫 Dropbox接続に失敗しました: {e}')
-        exit(1)
+# ▼ Dropboxクライアントの取得（3時間に1回リフレッシュ）
+def get_dropbox_client():
+    global dbx, last_refresh_time
 
-# ▼ Dropboxクライアントを初期化
-dbx = init_dropbox_client()
+    now = datetime.utcnow()
+    if dbx is None or last_refresh_time is None or now - last_refresh_time > REFRESH_INTERVAL:
+        access_token = refresh_access_token()
+        try:
+            dbx = dropbox.Dropbox(access_token)
+            dbx.users_get_current_account()
+            last_refresh_time = now
+            print('✅ Dropboxに接続しました。')
+        except Exception as e:
+            print(f'🚫 Dropbox接続に失敗しました: {e}')
+            exit(1)
+
+    return dbx
 
 # ▼ ファイルダウンロード関数
 def download_csv_from_dropbox(file_name):
     try:
+        dbx = get_dropbox_client()
         print(f"🔍 ファイルダウンロードを試みます: {file_name}")
         dropbox_path = f'/デイトレファイル/{file_name}'
         local_path = f'/tmp/{file_name}'
@@ -331,6 +342,7 @@ def download_csv_from_dropbox(file_name):
     except Exception as e:
         print(f"🚫 ファイルのダウンロードエラー: {e}")
         return None
+
 
 # ▼ 24時間監視ループ
 while True:
