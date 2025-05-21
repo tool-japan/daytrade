@@ -46,7 +46,7 @@ REVERSAL_SCORE = {
 }
 
 # ▼ 順張りの設定値
-TREND_SCORE_THRESHOLD = 4  # 順張りシグナルとして採用するための最小スコア
+TREND_SCORE_THRESHOLD = 5  # 順張りシグナルとして採用するための最小スコア
 RSI_TREND_BUY_THRESHOLD = 40  # RSIがこの値を超えたら順張り買いシグナル
 RSI_TREND_SELL_THRESHOLD = 60  # RSIがこの値を下回ったら順張り売りシグナル
 
@@ -90,7 +90,7 @@ def analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hi
     return None
 
 # ▼ 逆張りの設定値
-REVERSAL_SCORE_THRESHOLD = 3  # 逆張りシグナルとして採用するための最小スコア
+REVERSAL_SCORE_THRESHOLD = 4  # 逆張りシグナルとして採用するための最小スコア
 RSI_BUY_THRESHOLD = 45  # RSIがこの値以下なら逆張り買いシグナル
 RSI_SELL_THRESHOLD = 55  # RSIがこの値以上なら逆張り売りシグナル
 
