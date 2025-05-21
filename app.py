@@ -313,7 +313,10 @@ def get_dropbox_client():
     global dbx, last_refresh_time
 
     now = datetime.utcnow()
-    if dbx is None or last_refresh_time is None or now - last_refresh_time > REFRESH_INTERVAL:
+    time_since_refresh = (now - last_refresh_time) if last_refresh_time else None
+
+    if dbx is None or last_refresh_time is None or time_since_refresh > REFRESH_INTERVAL:
+        print(f"🔁 Dropboxクライアントを初期化します（前回更新から: {time_since_refresh}）")
         access_token = refresh_access_token()
         try:
             dbx = dropbox.Dropbox(access_token)
