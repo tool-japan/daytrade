@@ -233,28 +233,38 @@ def analyze_and_display_filtered_signals(file_path):
             try:
                 code = row["銘柄コード"]
                 name = row["銘柄名称"]
-                prices = pd.Series(row[price_columns].values.astype(float))
-                current_price = float(row["現在値"])
-                volume_spike = row["急増フラグ"]
 
-                # ▼ RSI & MACDヒストグラムを計算
+                # ▼ 現在値チェック
+                try:
+                    current_price = float(row["現在値"])
+                except:
+                    print(f"⚠ 現在値が不正のためスキップ: {code} {name}")
+                    continue
+                if current_price <= 0:
+                    print(f"⚠ 現在値が0以下のためスキップ: {code} {name}")
+                    continue
+
+                # ▼ 価格データチェック（G01〜G26）
+                prices = pd.Series(row[price_columns].values.astype(float))
+                if len(prices) < 2 or prices.isna().any() or prices.iloc[0] == 0:
+                    print(f"⚠ 無効な価格データスキップ: {code} {name}")
+                    continue
+
+                # ▼ 出来高スパイクなどの指標
+                volume_spike = row["急増フラグ"]
                 rsi = calculate_rsi(prices, period=RSI_PERIOD)
                 macd_hist = calculate_macd(prices)
-
-                # ▼ シグナルを判定（順張り→逆張りの順で評価）
                 board_balance = calculate_board_balance(row)
-                trend_strength = (prices[-1] - prices[0]) / prices[0]
+                trend_strength = (prices.iloc[-1] - prices.iloc[0]) / prices.iloc[0]
                 volatility = prices.pct_change().std()
 
                 signal = analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hist, board_balance)
                 if not signal:
                     signal = analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance, volatility)
 
-
                 if not signal:
                     continue
 
-                # ▼ 出力データに追加
                 output_data.append({
                     "銘柄コード": code,
                     "銘柄名称": name,
@@ -266,15 +276,9 @@ def analyze_and_display_filtered_signals(file_path):
                     "板バランス": round(board_balance, 2)
                 })
 
-
             except Exception as e:
                 print(f"データ処理エラー（{code}）: {e}")
 
-        # ▼ 結果をメール送信
-        send_output_dataframe_via_email(output_data)
-
-    except Exception as e:
-        print(f"データ読み込みエラー: {e}")
 
 
 # ▼ 出力データから HTML テーブルを生成
