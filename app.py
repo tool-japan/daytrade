@@ -279,9 +279,6 @@ def format_output_html(df):
     h3 { margin-top: 24px; }
 </style>
 <table>
-  <tr>
-    <th>コード</th><th>銘柄名</th><th>株価</th><th>松井証券</th><th>X検索</th>
-  </tr>
 """]
 
     for signal in signal_order:
