@@ -273,7 +273,7 @@ sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)      
 
 # ▼ リフレッシュ間隔（3時間）
-REFRESH_INTERVAL = timedelta(hours=0.1)
+REFRESH_INTERVAL = timedelta(hours=3)
 
 # ▼ グローバル状態を保持
 dbx = None
