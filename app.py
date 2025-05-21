@@ -216,16 +216,23 @@ def detect_breakout(df):
 
 # ▼ CSVファイルを分析し、テクニカルシグナルを判定してメール送信
 def analyze_and_display_filtered_signals(file_path):
+    
+
+    
+    
     try:
         df = pd.read_csv(file_path)
         df.columns = df.columns.str.strip().str.replace("　", "").str.replace(" ", "")
+        
+        print("📊 データ冒頭の数行:\n", df.head())
+        print("📌 カラム一覧:", df.columns.tolist())
 
         # ▼ 出来高スパイク検出とブレイクアウトシグナル取得
         df = calculate_volume_spike(df)
         breakout_signals = detect_breakout(df)
 
         # ▼ 価格列の抽出（例：G01〜G26）
-        price_columns = df.columns[31:57]
+        price_columns = [f"G{i:02d}" for i in range(1, 27)]  # G01～G26 明示的に指定
 
         # ▼ 全銘柄を対象に分析（価格フィルタは削除）
         output_data = breakout_signals
