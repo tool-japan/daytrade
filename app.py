@@ -262,97 +262,94 @@ def analyze_and_display_filtered_signals(file_path):
         print(f"データ読み込みエラー: {e}")
 
 
-# ▼ 出力データをテキスト形式に整形（メール本文用）
-def format_output_text(df):
+# ▼ 出力データから HTML テーブルを生成
+def format_output_html(df):
     signal_order = [
         "買い目-順張り", "買い目-逆張り",
         "売り目-順張り", "売り目-逆張り",
         "買い目-ブレイクアウト", "売り目-ブレイクアウト"
     ]
-    lines = []
 
-    # ▼ 表のヘッダー（全体で1回だけ）
-    lines.append("コード   銘柄名       株価     RSI    出来高増加率   板バランス")
-    lines.append("-------------------------------------------------------------------------------------------")
-    lines.append("")
+    html = ["""
+<html><body>
+<style>
+    table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
+    th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    h3 { margin-top: 24px; }
+</style>
+<table>
+  <tr>
+    <th>コード</th><th>銘柄名</th><th>株価</th><th>松井証券</th><th>X検索</th>
+  </tr>
+"""]
 
     for signal in signal_order:
         group = df[df["シグナル"] == signal]
-
-        # ▼ セクションタイトル
-        lines.append(f"■■■ {signal}")
+        html.append(f"<tr><td colspan='5'><h3>■ {signal}</h3></td></tr>")
 
         if group.empty:
-            lines.append("シグナルなし")
+            html.append("<tr><td colspan='5'>シグナルなし</td></tr>")
         else:
             for _, row in group.iterrows():
-                code = str(row['銘柄コード'])
-                name = str(row['銘柄名称'])
+                code = str(row["銘柄コード"])
+                name = str(row["銘柄名称"])
                 price = f"{int(row['株価']):,}円"
-                rsi = f"{row.get('RSI', '–'):.1f}" if pd.notnull(row.get('RSI')) else "–"
-                vol = f"{row.get('出来高増加率', '–') * 100:.1f}%" if pd.notnull(row.get('出来高増加率')) else "–"
-                board = f"{row.get('板バランス', '–'):.2f}" if pd.notnull(row.get('板バランス')) else "–"
+                matsui_url = f"https://finance.matsui.co.jp/stock/{code}/index"
+                x_url = f"https://x.com/search?q={code}%20{name}&src=typed_query&f=live"
 
-                lines.append(
-                    f"{code:<6} {name:<12} {price:>6}   {rsi:>5}   {vol:>8}   {board:>5}"
-                )
+                html.append(f"""<tr>
+<td>{code}</td>
+<td>{name}</td>
+<td>{price}</td>
+<td><a href="{matsui_url}" target="_blank">松井証券</a></td>
+<td><a href="{x_url}" target="_blank">X検索</a></td>
+</tr>""")
 
-        lines.append("")  # 区切りの空行
+    html.append("</table>")
 
-    # ▼ 注意文を末尾に追加
-    lines.append("""
-      【注意】
-    本分析は、特定の銘柄の売買を推奨するものではありません。
-    出力内容はあくまでテクニカル分析に基づく参考情報であり、最終的な投資判断はご自身の責任で慎重に行ってください。
-    市場動向は常に変動するため、本分析の結果に過信せず、複数の情報を組み合わせた冷静な判断を心がけてください。           
-                 
-    【各指標の説明】
-    - RSI（相対力指数）：
-    株価がどの程度「買われすぎ」「売られすぎ」かを示すテクニカル指標です。
-    価格変動をもとに、上昇幅と下落幅の平均から計算されます。
-    RSIが高いほど買われすぎ、低いほど売られすぎとされます。
+    html.append("""
+<br><br>
+<div style='font-family: sans-serif; font-size: 14px;'>
+<strong>【注意】</strong><br>
+本分析は、特定の銘柄の売買を推奨するものではありません。<br>
+出力内容はあくまでテクニカル分析に基づく参考情報であり、最終的な投資判断はご自身の責任で慎重に行ってください。<br>
+市場動向は常に変動するため、本分析の結果に過信せず、複数の情報を組み合わせた冷静な判断を心がけてください。<br><br>
 
-    - 出来高増加率：
-    最新の出来高が、過去の出来高と比べてどの程度増加したかを示す割合です。
-    出来高が急増している銘柄は、市場の注目が集まりやすいと考えられます。
+<strong>【シグナルの種類と意味】</strong><br><br>
 
-    - 板バランス：
-    買い注文と売り注文の量（気配数量）の比率を示します。
-    値が1.0より大きい場合は買いが優勢、1.0未満は売りが優勢と判断されます。
-    
-    【シグナルの種類と意味】
+    <strong>- 買い目-順張り：</strong><br>
+    株価が上昇トレンドに乗っており、今後も上昇が継続する可能性があると判断された買いのタイミングです。<br>
+    RSIやMACD、トレンド、出来高、板バランスが好調な銘柄が選ばれます。<br><br>
 
-    - 買い目-順張り：
-    株価が上昇トレンドに乗っており、今後も上昇が継続する可能性があると判断された買いのタイミングです。
-    RSIやMACD、トレンド、出来高、板バランスが好調な銘柄が選ばれます。
+    <strong>- 買い目-逆張り：</strong><br>
+    株価が短期的に下落しすぎており、反発上昇が期待される場面での買いシグナルです。<br>
+    RSIが低く、出来高やMACDなどが反転の兆しを見せている銘柄を抽出します。<br><br>
 
-    - 買い目-逆張り：
-    株価が短期的に下落しすぎており、反発上昇が期待される場面での買いシグナルです。
-    RSIが低く、出来高やMACDなどが反転の兆しを見せている銘柄を抽出します。
+    <strong>- 売り目-順張り：</strong><br>
+    株価が下降トレンドに入っており、さらに下落する可能性が高いと判断された売りのシグナルです。<br>
+    各種トレンド指標がネガティブ方向で一致している銘柄が対象です。<br><br>
 
-    - 売り目-順張り：
-    株価が下降トレンドに入っており、さらに下落する可能性が高いと判断された売りのシグナルです。
-    各種トレンド指標がネガティブ方向で一致している銘柄が対象です。
+    <strong>- 売り目-逆張り：</strong><br>
+    株価が短期的に上がりすぎており、下落への転換が近いと考えられる場面での売りシグナルです。<br>
+    RSIが高すぎる銘柄や、過熱感がある銘柄が選ばれます。<br><br>
 
-    - 売り目-逆張り：
-    株価が短期的に上がりすぎており、下落への転換が近いと考えられる場面での売りシグナルです。
-    RSIが高すぎる銘柄や、過熱感がある銘柄が選ばれます。
+    <strong>- 買い目-ブレイクアウト（ロング）：</strong><br>
+    株価が過去の上値抵抗線（前日終値など）を上抜けし、さらに出来高と板バランスも伴って強い上昇が確認されたシグナルです。<br>
+    急騰の初動を捉えるための買いタイミングを示します。<br><br>
 
-    - 買い目-ブレイクアウト（ロング）：
-    株価が過去の上値抵抗線（前日終値など）を上抜けし、さらに出来高と板バランスも伴って強い上昇が確認されたシグナルです。
-    急騰の初動を捉えるための買いタイミングを示します。
+    <strong>- 売り目-ブレイクアウト（ショート）：</strong><br>
+    株価が下値の節目を割り込み、出来高増加や売り優勢の板バランスを伴う場合に検出されるシグナルです。<br>
+    急落の初動や下げトレンドへの転換点を狙った売りの判断材料となります。<br>
+</div>
+</body></html>
+""")
 
-    - 売り目-ブレイクアウト（ショート）：
-    株価が下値の節目を割り込み、出来高増加や売り優勢の板バランスを伴う場合に検出されるシグナルです。
-    急落の初動や下げトレンドへの転換点を狙った売りの判断材料となります。
-
-    """)
-    
-
-    return "\n".join(lines)
+    return "\n".join(html)
 
 
-# ▼ SendGridを使って分析結果をメール送信（BCCモード）
+
+# ▼ SendGridを使って HTML メール送信（BCCモード）
 def send_output_dataframe_via_email(output_data):
     try:
         output_df = pd.DataFrame(output_data)
@@ -360,7 +357,7 @@ def send_output_dataframe_via_email(output_data):
         output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_order, ordered=True)
         output_df = output_df.sort_values(by=["シグナル"], ascending=[True])
 
-        message_text = format_output_text(output_df)
+        html_content = format_output_html(output_df)
 
         sendgrid_api_key = os.environ.get("SENDGRID_API_KEY")
         sender_email = os.environ.get("SENDER_EMAIL")
@@ -375,12 +372,12 @@ def send_output_dataframe_via_email(output_data):
             from_email=Email(sender_email),
             to_emails=To(sender_email),
             subject=email_subject,
-            plain_text_content=message_text
+            html_content=html_content
         )
         message.bcc = [Bcc(email) for email in recipient_emails]
         sg = SendGridAPIClient(sendgrid_api_key)
         response = sg.send(message)
-        print(f"✅ メール送信完了（BCCモード）: ステータスコード = {response.status_code}")
+        print(f"✅ HTMLメール送信完了（BCCモード）: ステータスコード = {response.status_code}")
     except Exception as e:
         print(f"🚫 メール送信エラー: {e}")
 
