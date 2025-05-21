@@ -216,14 +216,10 @@ def detect_breakout(df):
 
 # ▼ CSVファイルを分析し、テクニカルシグナルを判定してメール送信
 def analyze_and_display_filtered_signals(file_path):
-    
-
-    
-    
     try:
         df = pd.read_csv(file_path)
         df.columns = df.columns.str.strip().str.replace("　", "").str.replace(" ", "")
-        
+
         print("📊 データ冒頭の数行:\n", df.head())
         print("📌 カラム一覧:", df.columns.tolist())
 
@@ -232,7 +228,7 @@ def analyze_and_display_filtered_signals(file_path):
         breakout_signals = detect_breakout(df)
 
         # ▼ 価格列の抽出（例：G01〜G26）
-        price_columns = [f"G{i:02d}" for i in range(1, 27)]  # G01～G26 明示的に指定
+        price_columns = [f"G{i:02d}" for i in range(1, 27)]
 
         # ▼ 全銘柄を対象に分析（価格フィルタは削除）
         output_data = breakout_signals
@@ -244,20 +240,25 @@ def analyze_and_display_filtered_signals(file_path):
                 # ▼ 現在値チェック
                 try:
                     current_price = float(row["現在値"])
-                except:
-                    print(f"⚠ 現在値が不正のためスキップ: {code} {name}")
+                except Exception as e:
+                    print(f"⚠ 現在値が不正のためスキップ: {code} {name} - {e}")
                     continue
                 if current_price <= 0:
                     print(f"⚠ 現在値が0以下のためスキップ: {code} {name}")
                     continue
 
-                # ▼ 価格データチェック（G01〜G26）
-                prices = pd.Series(row[price_columns].values.astype(float))
-                
-                print(f"🧪 {code} - 価格データ: {row[price_columns].values}")
-                
-                if len(prices) < 2 or prices.isna().any() or prices.iloc[0] == 0:
-                    print(f"⚠ 無効な価格データスキップ: {code} {name}")
+                # ▼ 価格データチェック（G01〜G26） 安全にfloat変換
+                prices_raw = row[price_columns]
+                prices = pd.to_numeric(prices_raw, errors="coerce")
+
+                print(f"🧪 {code} - 価格データ（NaN含む）: {prices.values}")
+
+                # 無効なデータスキップ条件
+                if prices.isna().any():
+                    print(f"⚠ NaNを含む価格データのためスキップ: {code} {name}")
+                    continue
+                if len(prices) < 2 or prices.iloc[0] <= 0:
+                    print(f"⚠ 無効な価格データ（初値が0以下）スキップ: {code} {name}")
                     continue
 
                 # ▼ 出来高スパイクなどの指標
@@ -265,12 +266,15 @@ def analyze_and_display_filtered_signals(file_path):
                 rsi = calculate_rsi(prices, period=RSI_PERIOD)
                 macd_hist = calculate_macd(prices)
                 board_balance = calculate_board_balance(row)
+
                 try:
                     trend_strength = (prices.iloc[-1] - prices.iloc[0]) / prices.iloc[0]
                 except ZeroDivisionError:
                     trend_strength = 0
+
                 volatility = prices.pct_change().std()
 
+                # ▼ シグナル判定（順張り→逆張り）
                 signal = analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hist, board_balance)
                 if not signal:
                     signal = analyze_reversal_signals(volume_spike, rsi, macd_hist, board_balance, volatility)
@@ -278,6 +282,7 @@ def analyze_and_display_filtered_signals(file_path):
                 if not signal:
                     continue
 
+                # ▼ 出力データ追加
                 output_data.append({
                     "銘柄コード": code,
                     "銘柄名称": name,
@@ -291,8 +296,10 @@ def analyze_and_display_filtered_signals(file_path):
 
             except Exception as e:
                 print(f"データ処理エラー（{code}）: {type(e).__name__} - {e}")
-    except Exception as e:  # ← ← ← ★ これが抜けていた！
+
+    except Exception as e:
         print(f"データ読み込みエラー: {e}")
+
 
 
 # ▼ 出力データから HTML テーブルを生成
