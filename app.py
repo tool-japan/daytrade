@@ -19,7 +19,7 @@ RSI_PERIOD = 26  # RSIの計算期間（例：26本）
 TREND_LOOKBACK = 5  # トレンド判定で使う短期平均の参照期間
 
 # ▼ 設定値
-TREND_STRENGTH_THRESHOLD = 0.005  # 1%以上の上昇幅で加点
+TREND_STRENGTH_THRESHOLD = 0.01  # 1%以上の上昇幅で加点
 REVERSAL_VOLATILITY_THRESHOLD = 0.015  # 1.5%以上の標準偏差で加点
 
 # ▼ RSI（相対力指数）を計算する関数
@@ -255,7 +255,10 @@ def analyze_and_display_filtered_signals(file_path):
                 rsi = calculate_rsi(prices, period=RSI_PERIOD)
                 macd_hist = calculate_macd(prices)
                 board_balance = calculate_board_balance(row)
-                trend_strength = (prices.iloc[-1] - prices.iloc[0]) / prices.iloc[0]
+                try:
+                    trend_strength = (prices.iloc[-1] - prices.iloc[0]) / prices.iloc[0]
+                except ZeroDivisionError:
+                    trend_strength = 0
                 volatility = prices.pct_change().std()
 
                 signal = analyze_trend_signals(row, prices, current_price, volume_spike, rsi, macd_hist, board_balance)
@@ -299,6 +302,9 @@ def format_output_html(df):
     h3 { margin-top: 24px; }
 </style>
 <table>
+  <tr>
+    <th>コード</th><th>銘柄名</th><th>株価</th><th>松井証券</th><th>X検索</th>
+  </tr>
 """]
 
     for signal in signal_order:
