@@ -304,8 +304,6 @@ def format_output_html(df):
 <td>{code}</td>
 <td>{name}</td>
 <td>{price}</td>
-<td><a href="{matsui_url}" target="_blank">松井証券</a></td>
-<td><a href="{x_url}" target="_blank">X検索</a></td>
 <td style='padding-left: 16px;'><a href="{matsui_url}" target="_blank">松井証券</a></td>
 <td style='padding-left: 16px;'><a href="{x_url}" target="_blank">X検索</a></td>
 </tr>""")
