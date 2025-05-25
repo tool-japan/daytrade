@@ -135,7 +135,7 @@ def build_intraday_dataframe(target_date=None):
     return df_all
 
 
-# ▼ ----- 上昇／下降トレンド判定に必要な設定値（コメント付き） -----
+# ▼ ----- 上昇／【売り目】下降トレンド判定に必要な設定値（コメント付き） -----
 
 UPTREND_LOOKBACK = 60  
 # ✅ 過去何本を使ってトレンドを評価するか（最低必要本数）。  
@@ -202,7 +202,7 @@ PULLBACK_LOOKBACK = 10
 # 適正値：5～15　本数が多いと確実な反発だがタイミング遅れる。
 
 CROSS_LOOKBACK = 2  
-# ✅ ゴールデンクロス／デッドクロスで過去何本見るか。  
+# ✅ 【買い目】ゴールデンクロス／【売り目】デッドクロスで過去何本見るか。  
 # 通常は2本で十分。1本だと誤判定↑（精度↓）
 
 BOX_RANGE_WINDOW = 30  
@@ -316,7 +316,7 @@ def detect_trend(df_group, trend_type="up"):
 
     if trend_ok and ma_ok and rsi_ok and macd_ok and volume_ok and std_ok and (trigger_cross or trigger_pullback):
         return {
-            "シグナル": "上昇トレンド" if trend_type == "up" else "下降トレンド",
+            "シグナル": "【買い目】上昇トレンド" if trend_type == "up" else "【売り目】下降トレンド",
             "現在値": latest["現在値"],
             "MA_5": round(latest["MA_5"], 2),
             "MA_25": round(latest["MA_25"], 2),
@@ -338,7 +338,7 @@ def detect_uptrend(df_group):
 def detect_downtrend(df_group):
     return detect_trend(df_group, trend_type="down")
 
-# ▼ ゴールデンクロス検出（独立シグナル + ボラフィルター対応）
+# ▼ 【買い目】ゴールデンクロス検出（独立シグナル + ボラフィルター対応）
 def detect_golden_cross(df_group):
     df = df_group.tail(30).copy()
     if len(df) < CROSS_LOOKBACK:
@@ -359,7 +359,7 @@ def detect_golden_cross(df_group):
         volatility_ok
     ):
         return {
-            "シグナル": "ゴールデンクロス",
+            "シグナル": "【買い目】ゴールデンクロス",
             "現在値": df["現在値"].iloc[-1],
             "MA_5": round(df["MA_5"].iloc[-1], 2),
             "MA_25": round(df["MA_25"].iloc[-1], 2)
@@ -367,7 +367,7 @@ def detect_golden_cross(df_group):
     return None
 
 
-# ▼ デッドクロス検出（独立シグナル + ボラフィルター対応）
+# ▼ 【売り目】デッドクロス検出（独立シグナル + ボラフィルター対応）
 def detect_dead_cross(df_group):
     df = df_group.tail(30).copy()
     if len(df) < CROSS_LOOKBACK:
@@ -388,7 +388,7 @@ def detect_dead_cross(df_group):
         volatility_ok
     ):
         return {
-            "シグナル": "デッドクロス",
+            "シグナル": "【売り目】デッドクロス",
             "現在値": df["現在値"].iloc[-1],
             "MA_5": round(df["MA_5"].iloc[-1], 2),
             "MA_25": round(df["MA_25"].iloc[-1], 2)
@@ -439,13 +439,13 @@ def detect_box_range(df_group):
     # 条件満たせばシグナル返す
     if position_ratio <= (1 - BOX_EDGE_THRESHOLD) and volume_ok and volatility_ok:
         return {
-            "シグナル": "買い目-ボックスレンジ",
+            "シグナル": "【買い目】ボックスレンジ",
             "現在値": current,
             "平均値": round(mean, 2)
         }
     elif position_ratio >= BOX_EDGE_THRESHOLD and volume_ok and volatility_ok:
         return {
-            "シグナル": "売り目-ボックスレンジ",
+            "シグナル": "【売り目】ボックスレンジ",
             "現在値": current,
             "平均値": round(mean, 2)
         }
@@ -482,13 +482,13 @@ def detect_breakout(df_group):
     # 判定
     if current > high_max and volume_ok and volatility_ok:
         return {
-            "シグナル": "買い目-ブレイクアウト",
+            "シグナル": "【買い目】ブレイクアウト",
             "現在値": current,
             "高値上抜け基準": round(high_max, 2)
         }
     elif current < low_min and volume_ok and volatility_ok:
         return {
-            "シグナル": "売り目-ブレイクアウト",
+            "シグナル": "【売り目】ブレイクアウト",
             "現在値": current,
             "安値下抜け基準": round(low_min, 2)
         }
@@ -527,7 +527,7 @@ def detect_double_pattern(df_group):
 
         if price_diff_ratio < DOUBLE_PATTERN_TOLERANCE and price < mid_low and volume_spike and volatility_jump:
             return {
-                "シグナル": "売り目-ダブルトップ",
+                "シグナル": "【売り目】ダブルトップ",
                 "現在値": price,
                 "ネックライン": round(mid_low, 2),
                 "高値1": round(high1, 2),
@@ -550,7 +550,7 @@ def detect_double_pattern(df_group):
 
         if price_diff_ratio < DOUBLE_PATTERN_TOLERANCE and price > mid_high and volume_spike and volatility_jump:
             return {
-                "シグナル": "買い目-ダブルボトム",
+                "シグナル": "【買い目】ダブルボトム",
                 "現在値": price,
                 "ネックライン": round(mid_high, 2),
                 "安値1": round(low1, 2),
@@ -568,11 +568,11 @@ def detect_double_pattern(df_group):
 
 def format_output_html(df):
     signal_order = [
-        "上昇トレンド", "下降トレンド",
-        "ゴールデンクロス", "デッドクロス",
-        "買い目-ボックスレンジ", "売り目-ボックスレンジ",
-        "買い目-ブレイクアウト", "売り目-ブレイクアウト",
-        "買い目-ダブルボトム", "売り目-ダブルトップ"
+        "【買い目】上昇トレンド", "【売り目】下降トレンド",
+        "【買い目】ゴールデンクロス", "【売り目】デッドクロス",
+        "【買い目】ボックスレンジ", "【売り目】ボックスレンジ",
+        "【買い目】ブレイクアウト", "【売り目】ブレイクアウト",
+        "【買い目】ダブルボトム", "【売り目】ダブルトップ"
     ]
 
     html = ["""
@@ -621,29 +621,46 @@ def format_output_html(df):
                         </span><br><br>
 
                         <strong>【シグナルの種類と意味】</strong><br>
-                        <strong>- 買い目-順張り：</strong><br>
-                        株価が上昇トレンドに乗っており、今後も上昇が継続する可能性があると判断された買いシグナルです。<br>
-                        RSIやMACD、トレンド、出来高、板バランスが好調な銘柄が選ばれます。<br><br>
+                        <strong>- 【買い目】上昇トレンド：</strong><br>
+                        株価が短期・中期・長期の移動平均線の順に上向いており、トレンド、RSI、MACD、出来高が総合的に好調な場面で検出される買いシグナルです。<br>
+                        特に「戻り」や「クロス」などの押し目を示唆する動きが直近に現れている銘柄が対象です。<br><br>
 
-                        <strong>- 買い目-逆張り：</strong><br>
-                        株価が短期的に下落しすぎており、反発上昇が期待される場面での買いシグナルです。<br>
-                        RSIが低く、出来高やMACDなどが反転の兆しを見せている銘柄を抽出します。<br><br>
+                        <strong>- 【売り目】下降トレンド：</strong><br>
+                        株価が移動平均線の順に下向きに並び、トレンド、RSI、MACD、出来高が総じて弱含む状況で検出される売りシグナルです。<br>
+                        「戻り売り」や「デッドクロス」を伴う局面で、下落トレンドの加速が予測される銘柄が対象です。<br><br>
 
-                        <strong>- 売り目-順張り：</strong><br>
-                        株価が下降トレンドに入っており、さらに下落する可能性が高いと判断された売りのシグナルです。<br>
-                        各種トレンド指標がネガティブ方向で一致している銘柄が対象です。<br><br>
+                        <strong>- 【買い目】ゴールデンクロス：</strong><br>
+                        短期移動平均線（MA5）が中期移動平均線（MA25）を下から上へ突き抜けたときの買いシグナルです。<br>
+                        相場転換の兆しとして注目され、特にボラティリティが安定している局面でのシグナルが有効です。<br><br>
 
-                        <strong>- 売り目-逆張り：</strong><br>
-                        株価が短期的に上がりすぎており、下落への転換が近いと考えられる場面での売りシグナルです。<br>
-                        RSIが高すぎる銘柄や、過熱感がある銘柄が選ばれます。<br><br>
+                        <strong>- 【売り目】デッドクロス：</strong><br>
+                        短期移動平均線（MA5）が中期移動平均線（MA25）を上から下へ割り込んだときの売りシグナルです。<br>
+                        調整や下降局面の初動を捉える目的で使用され、安定的な下落圧力を示唆します。<br><br>
 
-                        <strong>- 買い目-ブレイクアウト：</strong><br>
-                        株価が過去の上値抵抗線（前日終値など）を上抜けし、さらに出来高と板バランスも伴って強い上昇が確認されたシグナルです。<br>
-                        急騰の初動を捉えるための買いタイミングを示します。<br><br>
+                        <strong>- 【買い目】ボックスレンジ：</strong><br>
+                        一定期間内の株価がレンジを形成し、その下限付近（サポートライン）で反発の兆しを見せている銘柄に対する逆張りの買いシグナルです。<br>
+                        出来高が直近で急増し、ボラティリティが落ち着いていることが条件となります。<br><br>
 
-                        <strong>- 売り目-ブレイクアウト：</strong><br>
-                        株価が下値の節目を割り込み、出来高増加や売り優勢の板バランスを伴う場合に検出されるシグナルです。<br>
-                        急落の初動や下げトレンドへの転換点を狙った売りの判断材料となります。<br>
+                        <strong>- 【売り目】ボックスレンジ：</strong><br>
+                        ボックスレンジの上限（レジスタンス）に接近し、反落の兆しを見せている銘柄に対する逆張りの売りシグナルです。<br>
+                        過熱感や出来高急増が確認されており、下落への転換が意識される局面で検出されます。<br><br>
+
+                        <strong>- 【買い目】ブレイクアウト：</strong><br>
+                        過去の上値抵抗線を明確に突破し、かつ出来高も平均を大きく上回る場面で発生する強気の買いシグナルです。<br>
+                        ボラティリティの急増とともに価格上昇が勢いを持っている初動を捉えます。<br><br>
+
+                        <strong>- 【売り目】ブレイクアウト：</strong><br>
+                        サポートラインや直近安値を割り込み、出来高も伴って下方向への勢いが強まっているときの売りシグナルです。<br>
+                        急落の始まりやトレンド転換のきっかけを狙う場面で効果的です。<br><br>
+
+                        <strong>- 【買い目】ダブルボトム：</strong><br>
+                        株価が2度安値を付けた後、ネックラインを上抜けることで反転上昇の兆候とみなされる買いシグナルです。<br>
+                        安値の水準がほぼ同じであり、出来高やボラティリティの急増を伴う場合に有効な買いタイミングとされます。<br><br>
+
+                        <strong>- 【売り目】ダブルトップ：</strong><br>
+                        高値圏で2つの山を形成した後、ネックラインを下抜けることで下落トレンド入りを示唆する売りシグナルです。<br>
+                        直近の高値水準が近く、出来高増加やボラティリティの上昇が確認できる局面で強い売りシグナルとして機能します。<br><br>
+
                     </div>
                     </body></html>
                     """)
@@ -655,11 +672,11 @@ def send_output_dataframe_via_email(output_data, current_time):
     try:
         output_df = pd.DataFrame(output_data)
         signal_priority = [
-            "上昇トレンド", "下降トレンド",
-            "ゴールデンクロス", "デッドクロス",
-            "買い目-ボックスレンジ", "売り目-ボックスレンジ",
-            "買い目-ブレイクアウト", "売り目-ブレイクアウト",
-            "買い目-ダブルボトム", "売り目-ダブルトップ"
+            "【買い目】上昇トレンド", "【売り目】下降トレンド",
+            "【買い目】ゴールデンクロス", "【売り目】デッドクロス",
+            "【買い目】ボックスレンジ", "【売り目】ボックスレンジ",
+            "【買い目】ブレイクアウト", "【売り目】ブレイクアウト",
+            "【買い目】ダブルボトム", "【売り目】ダブルトップ"
         ]
         output_df["シグナル"] = pd.Categorical(output_df["シグナル"], categories=signal_priority, ordered=True)
         output_df = output_df.sort_values(by=["シグナル", "現在値"], ascending=[True, False])
