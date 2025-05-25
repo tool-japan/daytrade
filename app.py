@@ -700,29 +700,33 @@ def analyze_and_display_filtered_signals(df, current_time):
 while True:
     try:
         now = get_japan_time()
-        check_date = TEST_DATE if TEST_DATE else now.strftime("%Y%m%d")
-        check_time = TEST_TIME if TEST_TIME else now.strftime("%H%M")
 
-        weekday = now.weekday()  # 0=月, 6=日
-        current_only = now.time()
-        is_weekday = weekday < 5
-        is_not_holiday = not jpholiday.is_holiday(now.date())
+        # ▼ テスト日・テスト時刻があればそれを使う
+        check_date = datetime.strptime(TEST_DATE, "%Y%m%d").date() if TEST_DATE else now.date()
+        check_time = datetime.strptime(TEST_TIME, "%H%M").time() if TEST_TIME else now.time()
+        current_time_str = TEST_TIME if TEST_TIME else now.strftime("%H%M")
+        today_date_str = TEST_DATE if TEST_DATE else now.strftime("%Y%m%d")
+
+        # ▼ 稼働条件チェック
+        is_weekday = check_date.weekday() < 5
+        is_not_holiday = not jpholiday.is_holiday(check_date)
         is_within_trading_time = (
-            datetime.strptime("09:00", "%H:%M").time() <= current_only <= datetime.strptime("11:30", "%H:%M").time()
-            or datetime.strptime("12:30", "%H:%M").time() <= current_only <= datetime.strptime("15:00", "%H:%M").time()
+            datetime.strptime("09:00", "%H:%M").time() <= check_time <= datetime.strptime("11:30", "%H:%M").time()
+            or datetime.strptime("12:30", "%H:%M").time() <= check_time <= datetime.strptime("15:00", "%H:%M").time()
         )
 
         if is_weekday and is_not_holiday and is_within_trading_time:
-            print(f"📂 処理対象日: {check_date}")
+            print(f"📂 処理対象日: {today_date_str}（時刻: {current_time_str}）")
 
+            # ▼ 当日の全CSVを結合して分析
             df_all = build_intraday_dataframe()
             if not df_all.empty:
                 print("🔎 データ結合完了。全銘柄分析を開始...")
-                analyze_and_display_filtered_signals(df_all, check_time)
+                analyze_and_display_filtered_signals(df_all, current_time_str)
             else:
                 print("📭 データが存在しないため、処理をスキップします。")
         else:
-            print(f"⏳ 非稼働時間（週末 or 祝日 or 取引時間外）: {check_date} {check_time}")
+            print(f"⏳ 非稼働時間（週末 or 祝日 or 取引時間外）: {check_date} {check_time.strftime('%H:%M')}")
 
         print("⏲️ 1分間待機中...")
         time.sleep(60)
