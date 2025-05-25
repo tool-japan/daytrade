@@ -3,3 +3,4 @@ numpy
 dropbox==11.36.0
 sendgrid
 requests
+jpholiday
