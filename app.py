@@ -12,7 +12,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Bcc
 
 # ▼ テスト実行用に固定日付や時刻を指定できる（空欄ならリアルタイム）
-TEST_DATE = "20250523"  # 例: "20250517"
+TEST_DATE = "20250522"  # 例: "20250517"
 TEST_TIME = "1459"  # 例: "1000"（空欄ならリアルタイム）
 
 # ▼ バッファリングの無効化（ログを即時に出力）
