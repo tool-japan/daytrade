@@ -740,7 +740,7 @@ while True:
         is_weekday = check_date.weekday() < 5
         is_not_holiday = not jpholiday.is_holiday(check_date)
         is_within_trading_time = (
-            datetime.strptime("09:00", "%H:%M").time() <= check_time <= datetime.strptime("11:30", "%H:%M").time()
+            datetime.strptime("09:02", "%H:%M").time() <= check_time <= datetime.strptime("11:30", "%H:%M").time()
             or datetime.strptime("12:30", "%H:%M").time() <= check_time <= datetime.strptime("15:00", "%H:%M").time()
         )
 
