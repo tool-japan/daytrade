@@ -716,22 +716,29 @@ def analyze_and_display_filtered_signals(file_path, current_time):
 
 
 
-# ▼ 24時間監視ループ（平日かつ祝日以外の 9:00-11:30 / 12:30-15:00 のみ稼働）
+# ▼ 監視ループ（平日かつ祝日以外の 9:00-11:30 / 12:30-15:00 のみ稼働）
 while True:
     try:
         now = get_japan_time()
-        weekday = now.weekday()  # 0=月, 6=日
-        current_time = now.strftime("%H%M")
-        current_only = now.time()
 
-        # 平日かつ祝日でないかをチェック（前場・後場）
-        if weekday < 5 and not jpholiday.is_holiday(now.date()) and (
-            (datetime.strptime("09:00", "%H:%M").time() <= current_only <= datetime.strptime("11:30", "%H:%M").time()) or
-            (datetime.strptime("12:30", "%H:%M").time() <= current_only <= datetime.strptime("15:00", "%H:%M").time())
-        ):
-            today_date = TEST_DATE if TEST_DATE else now.strftime("%Y%m%d")
-            current_time = TEST_TIME if TEST_TIME else now.strftime("%H%M")
+        # ▼ テスト用日付・時刻を優先（空欄なら現在時刻）
+        today_date = TEST_DATE if TEST_DATE else now.strftime("%Y%m%d")
+        current_time = TEST_TIME if TEST_TIME else now.strftime("%H%M")
 
+        # ▼ 判定用のdatetime.dateとdatetime.timeを構築
+        check_date = datetime.strptime(today_date, "%Y%m%d").date()
+        check_time = datetime.strptime(current_time, "%H%M").time()
+
+        # ▼ 曜日・祝日・時間帯を判定
+        is_weekday = check_date.weekday() < 5
+        is_not_holiday = not jpholiday.is_holiday(check_date)
+        is_within_trading_time = (
+            datetime.strptime("09:00", "%H:%M").time() <= check_time <= datetime.strptime("11:30", "%H:%M").time()
+        ) or (
+            datetime.strptime("12:30", "%H:%M").time() <= check_time <= datetime.strptime("15:00", "%H:%M").time()
+        )
+
+        if is_weekday and is_not_holiday and is_within_trading_time:
             file_name = f"kabuteku{today_date}_{current_time}.csv"
             print(f"📂 処理対象ファイル: {file_name}")
 
@@ -742,10 +749,11 @@ while True:
             else:
                 print(f"🚫 ファイルが見つかりません: {file_name}")
         else:
-            print("⏳ 非稼働時間（週末 or 祝日 or 取引時間外）のためスキップ中...")
+            print(f"⏳ 非稼働時間（週末 or 祝日 or 取引時間外）: {check_date} {check_time}")
 
         print("⏲️ 1分間待機中...")
         time.sleep(60)
 
     except Exception as e:
         print(f"🚫 メインループエラー: {e}")
+
