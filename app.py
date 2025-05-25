@@ -77,22 +77,6 @@ def get_dropbox_client():
             exit(1)
     return dbx
 
-# ▼ DropboxからCSVファイルをダウンロードする関数（1ファイル）
-def download_csv_from_dropbox(file_name):
-    try:
-        dbx = get_dropbox_client()
-        print(f"🔍 ファイルダウンロードを試みます: {file_name}")
-        dropbox_path = f'/デイトレファイル/{file_name}'
-        local_path = f'/tmp/{file_name}'
-        os.makedirs('/tmp', exist_ok=True)
-        with open(local_path, 'wb') as f:
-            metadata, res = dbx.files_download(path=dropbox_path)
-            f.write(res.content)
-        print(f"✅ ダウンロード完了: {dropbox_path} -> {local_path}")
-        return local_path
-    except Exception as e:
-        print(f"🚫 ファイルのダウンロードエラー: {e}")
-        return None
 
 # ▼ 🔹追加関数①：今日の日付のCSVファイル一覧（hhmm順）を取得
 def list_today_csv_files():
@@ -676,11 +660,9 @@ def send_output_dataframe_via_email(output_data, current_time):
         print(f"🚫 メール送信エラー: {e}")
 
 
-# ▼ ファイルを分析してメール送信する関数
-
-def analyze_and_display_filtered_signals(file_path, current_time):
+# ▼ ファイルを分析してメール送信する関数（修正済み: dfを直接渡す）
+def analyze_and_display_filtered_signals(df, current_time):
     try:
-        df = pd.read_csv(file_path)
         df.columns = df.columns.str.strip().str.replace("　", "").str.replace(" ", "")
 
         output_data = []
@@ -711,43 +693,34 @@ def analyze_and_display_filtered_signals(file_path, current_time):
             print("ℹ️ シグナルなし。メール送信スキップ")
 
     except Exception as e:
-        print(f"🚫 データ読み込みエラー: {e}")
+        print(f"🚫 データ処理エラー: {e}")
 
 
-
-
-# ▼ 監視ループ（平日かつ祝日以外の 9:00-11:30 / 12:30-15:00 のみ稼働）
+# ▼ 修正済み：監視ループ本体（build_intraday_dataframe() で当日CSVを全件取得）
 while True:
     try:
         now = get_japan_time()
+        check_date = TEST_DATE if TEST_DATE else now.strftime("%Y%m%d")
+        check_time = TEST_TIME if TEST_TIME else now.strftime("%H%M")
 
-        # ▼ テスト用日付・時刻を優先（空欄なら現在時刻）
-        today_date = TEST_DATE if TEST_DATE else now.strftime("%Y%m%d")
-        current_time = TEST_TIME if TEST_TIME else now.strftime("%H%M")
-
-        # ▼ 判定用のdatetime.dateとdatetime.timeを構築
-        check_date = datetime.strptime(today_date, "%Y%m%d").date()
-        check_time = datetime.strptime(current_time, "%H%M").time()
-
-        # ▼ 曜日・祝日・時間帯を判定
-        is_weekday = check_date.weekday() < 5
-        is_not_holiday = not jpholiday.is_holiday(check_date)
+        weekday = now.weekday()  # 0=月, 6=日
+        current_only = now.time()
+        is_weekday = weekday < 5
+        is_not_holiday = not jpholiday.is_holiday(now.date())
         is_within_trading_time = (
-            datetime.strptime("09:00", "%H:%M").time() <= check_time <= datetime.strptime("11:30", "%H:%M").time()
-        ) or (
-            datetime.strptime("12:30", "%H:%M").time() <= check_time <= datetime.strptime("15:00", "%H:%M").time()
+            datetime.strptime("09:00", "%H:%M").time() <= current_only <= datetime.strptime("11:30", "%H:%M").time()
+            or datetime.strptime("12:30", "%H:%M").time() <= current_only <= datetime.strptime("15:00", "%H:%M").time()
         )
 
         if is_weekday and is_not_holiday and is_within_trading_time:
-            file_name = f"kabuteku{today_date}_{current_time}.csv"
-            print(f"📂 処理対象ファイル: {file_name}")
+            print(f"📂 処理対象日: {check_date}")
 
-            file_path = download_csv_from_dropbox(file_name)
-            if file_path:
-                print(f"🔎 分析を開始します: {file_path}")
-                analyze_and_display_filtered_signals(file_path, current_time)
+            df_all = build_intraday_dataframe()
+            if not df_all.empty:
+                print("🔎 データ結合完了。全銘柄分析を開始...")
+                analyze_and_display_filtered_signals(df_all, check_time)
             else:
-                print(f"🚫 ファイルが見つかりません: {file_name}")
+                print("📭 データが存在しないため、処理をスキップします。")
         else:
             print(f"⏳ 非稼働時間（週末 or 祝日 or 取引時間外）: {check_date} {check_time}")
 
@@ -756,4 +729,3 @@ while True:
 
     except Exception as e:
         print(f"🚫 メインループエラー: {e}")
-
