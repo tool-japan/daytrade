@@ -79,9 +79,9 @@ def get_dropbox_client():
 
 
 # ▼ 🔹追加関数①：今日の日付のCSVファイル一覧（hhmm順）を取得
-def list_today_csv_files():
+def list_today_csv_files(target_date=None):
     dbx = get_dropbox_client()
-    today = get_japan_time().strftime("%Y%m%d")
+    today = target_date if target_date else get_japan_time().strftime("%Y%m%d")
     files = []
 
     try:
@@ -106,10 +106,11 @@ def list_today_csv_files():
 
     return sorted(files, key=lambda x: x[0])
 
+
 # ▼ 🔹追加関数②：ファイルを結合し、時系列データフレームを構築
-def build_intraday_dataframe():
+def build_intraday_dataframe(target_date=None):
     dbx = get_dropbox_client()
-    files = list_today_csv_files()
+    files = list_today_csv_files(target_date)
     combined_df = []
 
     for hhmm, fname in files:
@@ -719,7 +720,7 @@ while True:
             print(f"📂 処理対象日: {today_date_str}（時刻: {current_time_str}）")
 
             # ▼ 当日の全CSVを結合して分析
-            df_all = build_intraday_dataframe()
+            df_all = build_intraday_dataframe(target_date=today_date_str)
             if not df_all.empty:
                 print("🔎 データ結合完了。全銘柄分析を開始...")
                 analyze_and_display_filtered_signals(df_all, current_time_str)
