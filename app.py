@@ -144,7 +144,7 @@ UPTREND_LOOKBACK = 60
 # ✅ トレンド評価に使う本数。過去何本で傾向を評価するか（最低60本）
 # 適正値：60〜300（多いと精度↑、反応速度↓）
 
-UPTREND_HIGH_LOW_LENGTH = 3  
+UPTREND_HIGH_LOW_LENGTH = 2  
 # ✅ 高値・安値が連続して切り上がっているかを見る本数
 # 適正値：3〜10（多いと強い傾向に限定）
 
@@ -158,15 +158,15 @@ VOLUME_PAST_WINDOW = 55
 # ✅ 出来高の直近/過去比較に使う本数（勢いの判定）
 
 STD_WINDOW = 20  
-VOLATILITY_THRESHOLD = 0.8  
+VOLATILITY_THRESHOLD = 1.2  
 # ✅ ボラティリティの判断に使う標準偏差とその閾値
 
 
 # ▼ ----- RSI / MACD 計算設定 -----
 
 RSI_PERIOD = 26  
-RSI_UP_THRESHOLD = 35     # RSIがこれを上回れば買い圧力あり（順張り）
-RSI_DOWN_THRESHOLD = 65   # RSIがこれを下回れば売り圧力あり（順張り）
+RSI_UP_THRESHOLD = 30     # RSIがこれを上回れば買い圧力あり（順張り）
+RSI_DOWN_THRESHOLD = 70   # RSIがこれを下回れば売り圧力あり（順張り）
 
 MACD_SHORT = 12  
 MACD_LONG = 26  
@@ -183,8 +183,8 @@ PULLBACK_LOOKBACK = 10
 # ▼ ----- クロス判定（ゴールデン / デッド） -----
 
 # ✅ クロス検出をより高精度に判定するための新設定
-CROSS_SLOPE_LOOKBACK = 3        # 傾き確認に使う本数
-CROSS_PREV_ORDER_LOOKBACK = 3   # クロス前にMAが逆順で並んでいた本数
+CROSS_SLOPE_LOOKBACK = 5        # 傾き確認に使う本数
+CROSS_PREV_ORDER_LOOKBACK = 5   # クロス前にMAが逆順で並んでいた本数
 USE_RSI_FOR_CROSS = True        # RSIをクロス条件に含めるか
 CROSS_RSI_THRESHOLD_BUY = 40    # ゴールデンクロス時にRSIがこの値より高い
 CROSS_RSI_THRESHOLD_SELL = 60   # デッドクロス時にRSIがこの値より低い
@@ -212,10 +212,10 @@ BOX_VOLATILITY_RATIO = 1.2
 
 # ▼ ----- ブレイクアウト設定 -----
 
-BREAKOUT_LOOKBACK = 20  
-BREAKOUT_VOLUME_RATIO = 1.5  
+BREAKOUT_LOOKBACK = 15  
+BREAKOUT_VOLUME_RATIO = 1.2  
 BREAKOUT_USE_VOLATILITY_SPIKE = True  
-BREAKOUT_VOLATILITY_RATIO = 1.2  
+BREAKOUT_VOLATILITY_RATIO = 1.0  
 # ✅ ブレイクアウト確認用の過去本数、出来高・ボラの急増基準
 
 
@@ -223,10 +223,10 @@ BREAKOUT_VOLATILITY_RATIO = 1.2
 
 DOUBLE_PATTERN_LOOKBACK = 40  
 DOUBLE_PATTERN_MIN_PEAKS = 2  
-DOUBLE_PATTERN_TOLERANCE = 0.005  
-DOUBLE_PATTERN_VOLUME_SPIKE_RATIO = 1.5  
+DOUBLE_PATTERN_TOLERANCE = 0.01  
+DOUBLE_PATTERN_VOLUME_SPIKE_RATIO = 1.2  
 DOUBLE_PATTERN_VOLATILITY_JUMP = True  
-DOUBLE_PATTERN_VOLATILITY_RATIO = 1.3  
+DOUBLE_PATTERN_VOLATILITY_RATIO = 1.1  
 # ✅ パターンの確認本数、ピーク数、誤差率、出来高・ボラ条件
 
 
