@@ -15,16 +15,22 @@ from sendgrid.helpers.mail import Mail, Email, To, Bcc
 TEST_DATE = ""  # 例: "20250517"
 TEST_TIME = ""  # 例: "1000"（空欄ならリアルタイム）
 
+# ▼ テスト実行用の時刻シフト（マイナス何時間するか）
+TIME_SHIFT_HOURS = 0  # ← ここを変えるだけ！マイナスなら「過去」にずれる
+
+# ▼ JST（日本標準時）のタイムゾーン設定
+JST = timezone(timedelta(hours=9))
+
+# ▼ シフトされた「仮想の日本時間」を返す関数
+def get_japan_time():
+    real_now = datetime.now(JST)
+    shifted_time = real_now + timedelta(hours=TIME_SHIFT_HOURS)
+    return shifted_time
+
+
 # ▼ バッファリングの無効化（ログを即時に出力）
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
-
-# ▼ タイムゾーンを日本時間（JST）に設定
-JST = timezone(timedelta(hours=9))
-
-# ▼ 現在の日本時間を取得
-def get_japan_time():
-    return datetime.now(JST)
 
 # ▼ アクセストークンを定期的にリフレッシュするための設定（3時間）
 REFRESH_INTERVAL = timedelta(hours=3)
@@ -112,15 +118,16 @@ def list_today_csv_files(target_date=None, limit=90, current_hhmm=None):
     try:
         idx = hhmm_list.index(current_hhmm)
     except ValueError:
-        # ファイル名が存在しない場合は一番近いものを探す（安全策）
-        idx = next((i for i, h in enumerate(hhmm_list) if h > current_hhmm), len(hhmm_list)) - 1
-        
-        if idx < 0:
-            idx = 0
-        
+        # ✅ 修正：current_hhmmより直前のファイルを探す
+        prior_candidates = [i for i, h in enumerate(hhmm_list) if h < current_hhmm]
+        if prior_candidates:
+            idx = prior_candidates[-1]  # 直前の時刻
+        else:
+            idx = 0  # すべて future の場合
 
     start_idx = max(0, idx - limit + 1)
     return files_sorted[start_idx:idx + 1]
+
 
 
 
