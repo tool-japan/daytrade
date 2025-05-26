@@ -228,16 +228,28 @@ BREAKOUT_VOLUME_RATIO = 1.5
 # ✅ ブレイク時に出来高が平均の何倍なら「有効」とみなすか。  
 # 適正値：1.2～2.0　大きいほど強い確信が必要（精度↑）
 
-DOUBLE_PATTERN_LOOKBACK = 20  
-# ✅ ダブルトップ／ボトム検出に使うローソクの本数。  
-# 適正値：10～30　大きいと形状が安定して信頼性↑
+DOUBLE_PATTERN_LOOKBACK = 40  
+# ✅ 検出に使うローソクの本数（ダブルパターン全体を見る範囲）
+# 推奨値：30〜60　本数が多いほど安定パターンに対応
+
+DOUBLE_PATTERN_MIN_PEAKS = 2  
+# ✅ 山（または谷）の数。最低何個あればパターンと見なすか
+# 通常は2で良いが、精度を高めたい場合は3以上もあり得る
 
 DOUBLE_PATTERN_TOLERANCE = 0.005  
-# ✅ 高値A ≒ 高値B とみなす許容誤差率。  
-# 適正値：0.003～0.01　小さいほど精度↑、だが検出は減る
+# ✅ 高値A≒高値B（または安値A≒安値B）と見なす誤差率
+# 推奨：0.003〜0.01　小さいと精度↑だが検出減る
 
-DOUBLE_PATTERN_VOLUME_SPIKE_RATIO = 1.5  # ピーク時の出来高が平均の何倍以上なら有効か
-DOUBLE_PATTERN_VOLATILITY_JUMP = True   # ボラティリティが急増している必要があるか
+DOUBLE_PATTERN_VOLUME_SPIKE_RATIO = 1.5  
+# ✅ ピーク時の出来高が平均の何倍以上ならスパイクと判定
+
+DOUBLE_PATTERN_VOLATILITY_JUMP = True  
+# ✅ ボラティリティ急増も検出条件に含めるかどうか
+
+DOUBLE_PATTERN_VOLATILITY_RATIO = 1.3  
+# ✅ ボラ急増とみなす倍率（現在のstd > 平均std×この値）
+# 推奨：1.2〜1.5
+
 
 VOLATILITY_JUMP_RATIO = 1.3
 # ✅ 現在の標準偏差が平均の1.3倍を超えていれば「ボラティリティ急増」と判断
@@ -501,10 +513,10 @@ def detect_breakout(df_group):
 
 # ▼ ダブルトップ・ボトム検出（ピーク自動判定付き）
 def detect_double_pattern(df_group):
-    df = df_group.tail(DOUBLE_PATTERN_LOOKBACK).copy()
-    if len(df) < 7:
+    if len(df_group) < DOUBLE_PATTERN_LOOKBACK:
         return None
 
+    df = df_group.tail(DOUBLE_PATTERN_LOOKBACK).copy()
     price = df["現在値"].iloc[-1]
     highs = df["高値"].values
     lows = df["安値"].values
@@ -517,7 +529,7 @@ def detect_double_pattern(df_group):
     valleys_low = [i for i in range(1, len(lows)-1) if lows[i-1] > lows[i] < lows[i+1]]
 
     # ▼ ダブルトップ検出
-    if len(peaks_high) >= 2:
+    if len(peaks_high) >= DOUBLE_PATTERN_MIN_PEAKS:
         i1, i2 = peaks_high[-2], peaks_high[-1]
         high1, high2 = highs[i1], highs[i2]
         mid_low = lows[min(i1+1, i2-1):max(i1, i2)].min()
@@ -526,7 +538,7 @@ def detect_double_pattern(df_group):
         price_diff_ratio = abs(high1 - high2) / high1
         volume_spike = volumes[i1] > volume_avg * DOUBLE_PATTERN_VOLUME_SPIKE_RATIO and \
                        volumes[i2] > volume_avg * DOUBLE_PATTERN_VOLUME_SPIKE_RATIO
-        volatility_jump = std_now > std_avg * VOLATILITY_JUMP_RATIO if DOUBLE_PATTERN_VOLATILITY_JUMP else True
+        volatility_jump = std_now > std_avg * DOUBLE_PATTERN_VOLATILITY_RATIO if DOUBLE_PATTERN_VOLATILITY_JUMP else True
 
         if price_diff_ratio < DOUBLE_PATTERN_TOLERANCE and price < mid_low and volume_spike and volatility_jump:
             return {
@@ -540,7 +552,7 @@ def detect_double_pattern(df_group):
             }
 
     # ▼ ダブルボトム検出
-    if len(valleys_low) >= 2:
+    if len(valleys_low) >= DOUBLE_PATTERN_MIN_PEAKS:
         i1, i2 = valleys_low[-2], valleys_low[-1]
         low1, low2 = lows[i1], lows[i2]
         mid_high = highs[min(i1+1, i2-1):max(i1, i2)].max()
@@ -549,7 +561,7 @@ def detect_double_pattern(df_group):
         price_diff_ratio = abs(low1 - low2) / low1
         volume_spike = volumes[i1] > volume_avg * DOUBLE_PATTERN_VOLUME_SPIKE_RATIO and \
                        volumes[i2] > volume_avg * DOUBLE_PATTERN_VOLUME_SPIKE_RATIO
-        volatility_jump = std_now > std_avg if DOUBLE_PATTERN_VOLATILITY_JUMP else True
+        volatility_jump = std_now > std_avg * DOUBLE_PATTERN_VOLATILITY_RATIO if DOUBLE_PATTERN_VOLATILITY_JUMP else True
 
         if price_diff_ratio < DOUBLE_PATTERN_TOLERANCE and price > mid_high and volume_spike and volatility_jump:
             return {
@@ -563,6 +575,7 @@ def detect_double_pattern(df_group):
             }
 
     return None
+
 
 
 
