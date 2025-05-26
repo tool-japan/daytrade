@@ -144,7 +144,7 @@ UPTREND_LOOKBACK = 60
 # ✅ トレンド評価に使う本数。過去何本で傾向を評価するか（最低60本）
 # 適正値：60〜300（多いと精度↑、反応速度↓）
 
-UPTREND_HIGH_LOW_LENGTH = 5  
+UPTREND_HIGH_LOW_LENGTH = 3  
 # ✅ 高値・安値が連続して切り上がっているかを見る本数
 # 適正値：3〜10（多いと強い傾向に限定）
 
@@ -158,15 +158,15 @@ VOLUME_PAST_WINDOW = 55
 # ✅ 出来高の直近/過去比較に使う本数（勢いの判定）
 
 STD_WINDOW = 20  
-VOLATILITY_THRESHOLD = 0.5  
+VOLATILITY_THRESHOLD = 0.8  
 # ✅ ボラティリティの判断に使う標準偏差とその閾値
 
 
 # ▼ ----- RSI / MACD 計算設定 -----
 
 RSI_PERIOD = 26  
-RSI_UP_THRESHOLD = 40     # RSIがこれを上回れば買い圧力あり（順張り）
-RSI_DOWN_THRESHOLD = 60   # RSIがこれを下回れば売り圧力あり（順張り）
+RSI_UP_THRESHOLD = 35     # RSIがこれを上回れば買い圧力あり（順張り）
+RSI_DOWN_THRESHOLD = 65   # RSIがこれを下回れば売り圧力あり（順張り）
 
 MACD_SHORT = 12  
 MACD_LONG = 26  
@@ -259,7 +259,7 @@ def calculate_rsi(series: pd.Series, period: int = RSI_PERIOD) -> pd.Series:
 
 # ▼ トレンド判定共通関数
 def detect_trend(df_group, trend_type="up"):
-    df = df_group.tail(300).copy()
+    df = df_group.tail(90).copy()
     if len(df) < UPTREND_LOOKBACK:
         return None
 
@@ -789,8 +789,8 @@ while True:
         else:
             print(f"⏳ 非稼働時間（週末 or 祝日 or 取引時間外）: {check_date} {check_time.strftime('%H:%M')}")
 
-        print("⏲️ 1秒待機中...")
-        time.sleep(1)
+        print("⏲️ 1分間待機中...")
+        time.sleep(60)
 
     except Exception as e:
         print(f"🚫 メインループエラー: {e}")
