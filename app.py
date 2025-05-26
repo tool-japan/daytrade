@@ -114,6 +114,10 @@ def list_today_csv_files(target_date=None, limit=90, current_hhmm=None):
     except ValueError:
         # ファイル名が存在しない場合は一番近いものを探す（安全策）
         idx = next((i for i, h in enumerate(hhmm_list) if h > current_hhmm), len(hhmm_list)) - 1
+        
+        if idx < 0:
+            idx = 0
+        
 
     start_idx = max(0, idx - limit + 1)
     return files_sorted[start_idx:idx + 1]
