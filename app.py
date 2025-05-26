@@ -79,9 +79,10 @@ def get_dropbox_client():
 
 
 # ▼ 🔹修正済：CSVファイル一覧（hhmm順）を取得し、最新90件だけに絞る
-def list_today_csv_files(target_date=None, limit=90):
+def list_today_csv_files(target_date=None, limit=90, current_hhmm=None):
     dbx = get_dropbox_client()
     today = target_date if target_date else get_japan_time().strftime("%Y%m%d")
+    current_hhmm = current_hhmm if current_hhmm else get_japan_time().strftime("%H%M")
     files = []
 
     try:
@@ -104,15 +105,27 @@ def list_today_csv_files(target_date=None, limit=90):
         print(f"🚫 Dropboxファイル一覧取得エラー: {e}")
         return []
 
-    # hhmm順に並べて、最新 limit 件だけを取得
     files_sorted = sorted(files, key=lambda x: x[0])
-    return files_sorted[-limit:]  # 最新limit件
+
+    # 現在hhmmのインデックスを探して、そこまでの過去limit件を取得
+    hhmm_list = [f[0] for f in files_sorted]
+    try:
+        idx = hhmm_list.index(current_hhmm)
+    except ValueError:
+        # ファイル名が存在しない場合は一番近いものを探す（安全策）
+        idx = next((i for i, h in enumerate(hhmm_list) if h > current_hhmm), len(hhmm_list)) - 1
+
+    start_idx = max(0, idx - limit + 1)
+    return files_sorted[start_idx:idx + 1]
+
 
 
 
 def build_intraday_dataframe(target_date=None):
+    now = get_japan_time()
+    current_hhmm = now.strftime("%H%M")
     dbx = get_dropbox_client()
-    files = list_today_csv_files(target_date=target_date, limit=90)  # ← ここに制限を明示
+    files = list_today_csv_files(target_date=target_date, limit=90, current_hhmm=current_hhmm)
     combined_df = []
 
     for hhmm, fname in files:
@@ -135,6 +148,7 @@ def build_intraday_dataframe(target_date=None):
     df_all = df_all.sort_values(by=["銘柄コード", "ファイル時刻"]).reset_index(drop=True)
 
     return df_all
+
 
 
 
