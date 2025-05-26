@@ -422,6 +422,12 @@ def detect_box_range(df_group):
     current = price_series.iloc[-1]
     mean = price_series.mean()
 
+    if pd.isna(mean) or mean == 0:
+        code = df_group["銘柄コード"].iloc[-1]
+        name = df_group["銘柄名称"].iloc[-1]
+        print(f"⚠️ detect_box_range: 異常な平均値（{code} {name}）: mean={mean} → 判定スキップ")
+        return None
+
     # BOX_TOLERANCEによるボックス内判定
     if abs(current - mean) / mean > BOX_TOLERANCE:
         return None
