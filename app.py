@@ -789,8 +789,8 @@ while True:
         else:
             print(f"⏳ 非稼働時間（週末 or 祝日 or 取引時間外）: {check_date} {check_time.strftime('%H:%M')}")
 
-        print("⏲️ 1分間待機中...")
-        time.sleep(60)
+        print("⏲️ 1秒待機中...")
+        time.sleep(1)
 
     except Exception as e:
         print(f"🚫 メインループエラー: {e}")
