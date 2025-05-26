@@ -138,135 +138,102 @@ def build_intraday_dataframe(target_date=None):
 
 
 
-# ▼ ----- 上昇／【売り目】下降トレンド判定に必要な設定値（コメント付き） -----
+# ▼ ----- トレンド判定（上昇 / 下降）に関する設定 -----
 
 UPTREND_LOOKBACK = 60  
-# ✅ 過去何本を使ってトレンドを評価するか（最低必要本数）。  
-# 適正値：60～300　本数が多いほど精度↑だが反応は鈍化する。
+# ✅ トレンド評価に使う本数。過去何本で傾向を評価するか（最低60本）
+# 適正値：60〜300（多いと精度↑、反応速度↓）
 
 UPTREND_HIGH_LOW_LENGTH = 5  
-# ✅ 高値・安値の連続切り上げ/下げの確認に使う本数。  
-# 適正値：3～10　本数が多いほど強い傾向を示すが、検出数は減る（精度↑）
+# ✅ 高値・安値が連続して切り上がっているかを見る本数
+# 適正値：3〜10（多いと強い傾向に限定）
 
 MA_SHORT_WINDOW = 5  
-# ✅ 短期移動平均線（MA_5）。短期の価格変動を捉える。  
-# 適正値：3～10　小さいほど早く反応（精度↓）、大きいと安定（精度↑）
-
 MA_MID_WINDOW = 25  
-# ✅ 中期移動平均線。全体の流れを把握するのに使う。  
-# 適正値：20～50　短すぎるとノイズ↑、大きすぎると遅れる。
-
 MA_LONG_WINDOW = 60  
-# ✅ 長期移動平均線。トレンド全体の方向性判断。  
-# 適正値：50～100　大きいほど長期トレンドに忠実（精度↑）
+# ✅ 移動平均線（短・中・長期）。価格の流れを捉える
 
 VOLUME_RECENT_WINDOW = 5  
-# ✅ 出来高の直近平均。直近5本程度で勢いを見る。  
-# 適正値：3～10　小さいと反応早く検出多め（精度↓）
-
 VOLUME_PAST_WINDOW = 55  
-# ✅ 出来高の過去平均（比較用）。  
-# 適正値：30～100　大きいほど長期傾向を反映（精度↑）
+# ✅ 出来高の直近/過去比較に使う本数（勢いの判定）
 
 STD_WINDOW = 20  
-# ✅ 標準偏差の計算に使う期間（ボラティリティ判断）。  
-# 適正値：10～30　大きいと滑らかになるが、急変に弱い。
-
 VOLATILITY_THRESHOLD = 0.5  
-# ✅ 標準偏差がこれ以下なら「安定」とみなす。  
-# 適正値：0.3～1.0　小さいほど静かな相場しか通さない（精度↑）
+# ✅ ボラティリティの判断に使う標準偏差とその閾値
+
+
+# ▼ ----- RSI / MACD 計算設定 -----
 
 RSI_PERIOD = 26  
-# ✅ RSIの計算期間。価格の上昇・下落の強さの平均から算出。  
-# 適正値：14～30　大きいと滑らかだが反応は遅め（精度↑）
-
-RSI_UP_THRESHOLD = 40  
-# ✅ RSIがこれを上回ると「買い勢力あり」と判断（順張り用）  
-# 適正値：30～50　低いほど感度↑、高いほど強気な相場のみ検出（精度↑）
-
-RSI_DOWN_THRESHOLD = 60  
-# ✅ RSIがこれを下回ると「売り勢力あり」と判断（順張り用）  
-# 適正値：50～70　高いほど慎重に売り判断（精度↑）
+RSI_UP_THRESHOLD = 40     # RSIがこれを上回れば買い圧力あり（順張り）
+RSI_DOWN_THRESHOLD = 60   # RSIがこれを下回れば売り圧力あり（順張り）
 
 MACD_SHORT = 12  
-# ✅ MACDの短期EMAの期間。短いほど早く反応（精度↓）  
-# 適正値：10～15
-
 MACD_LONG = 26  
-# ✅ MACDの長期EMAの期間。MACD全体の傾向を決める。  
-# 適正値：20～30
-
 MACD_SIGNAL = 9  
-# ✅ MACDのシグナルライン（MACDのEMA）期間。  
-# 適正値：5～10　小さいと反応が早く、感度↑だがノイズも↑
+# ✅ MACD計算に使う短期EMA、長期EMA、シグナル線の期間
+
+
+# ▼ ----- 押し目 / 戻り判定設定 -----
 
 PULLBACK_LOOKBACK = 10  
-# ✅ 押し目・戻りパターン検出に使う本数。  
-# 適正値：5～15　本数が多いと確実な反発だがタイミング遅れる。
+# ✅ 押し目・戻りとして判断するために使う本数（トレンド内での調整確認）
 
-CROSS_LOOKBACK = 2  
-# ✅ 【買い目】ゴールデンクロス／【売り目】デッドクロスで過去何本見るか。  
-# 通常は2本で十分。1本だと誤判定↑（精度↓）
+
+# ▼ ----- クロス判定（ゴールデン / デッド） -----
+
+# ✅ クロス検出をより高精度に判定するための新設定
+CROSS_SLOPE_LOOKBACK = 3        # 傾き確認に使う本数
+CROSS_PREV_ORDER_LOOKBACK = 3   # クロス前にMAが逆順で並んでいた本数
+USE_RSI_FOR_CROSS = True        # RSIをクロス条件に含めるか
+CROSS_RSI_THRESHOLD_BUY = 40    # ゴールデンクロス時にRSIがこの値より高い
+CROSS_RSI_THRESHOLD_SELL = 60   # デッドクロス時にRSIがこの値より低い
+
+CROSS_USE_VOLATILITY_FILTER = True  
+CROSS_VOLATILITY_THRESHOLD = 0.5  
+# ✅ クロス時のボラティリティがこの閾値以下なら有効と判定
+
+# ✅ （旧）この設定は現在未使用 → 削除してOK
+# CROSS_LOOKBACK = 2  
+
+
+# ▼ ----- ボックスレンジ設定 -----
 
 BOX_RANGE_WINDOW = 30  
-# ✅ ボックスレンジの分析対象期間（範囲）。  
-# 適正値：20～50　大きいと安定して認識される（精度↑）
-
 BOX_TOLERANCE = 0.01  
-# ✅ 現在値と平均の誤差がこの値以下ならボックス内と判断。  
-# 適正値：0.005～0.02　小さいほど厳しい（精度↑）
-
 BOX_EDGE_THRESHOLD = 0.8  
-# ✅ ボックスレンジの上下8%で買い／売りを判断。  
-# 適正値：0.7～0.9　高すぎるとチャンス減、低すぎると誤判定↑
+# ✅ ボックスレンジの期間、ボックス内判定閾値、上下端の比率
+
+BOX_USE_VOLUME_SPIKE = True  
+BOX_USE_VOLATILITY_FILTER = True  
+BOX_VOLATILITY_RATIO = 1.2  
+# ✅ 出来高とボラによる追加フィルタ
+
+
+# ▼ ----- ブレイクアウト設定 -----
 
 BREAKOUT_LOOKBACK = 20  
-# ✅ 過去の高値・安値ブレイクを確認する期間。  
-# 適正値：15～30　大きいほど重要ラインを検出（精度↑）
-
 BREAKOUT_VOLUME_RATIO = 1.5  
-# ✅ ブレイク時に出来高が平均の何倍なら「有効」とみなすか。  
-# 適正値：1.2～2.0　大きいほど強い確信が必要（精度↑）
+BREAKOUT_USE_VOLATILITY_SPIKE = True  
+BREAKOUT_VOLATILITY_RATIO = 1.2  
+# ✅ ブレイクアウト確認用の過去本数、出来高・ボラの急増基準
+
+
+# ▼ ----- ダブルトップ / ボトム設定 -----
 
 DOUBLE_PATTERN_LOOKBACK = 40  
-# ✅ 検出に使うローソクの本数（ダブルパターン全体を見る範囲）
-# 推奨値：30〜60　本数が多いほど安定パターンに対応
-
 DOUBLE_PATTERN_MIN_PEAKS = 2  
-# ✅ 山（または谷）の数。最低何個あればパターンと見なすか
-# 通常は2で良いが、精度を高めたい場合は3以上もあり得る
-
 DOUBLE_PATTERN_TOLERANCE = 0.005  
-# ✅ 高値A≒高値B（または安値A≒安値B）と見なす誤差率
-# 推奨：0.003〜0.01　小さいと精度↑だが検出減る
-
 DOUBLE_PATTERN_VOLUME_SPIKE_RATIO = 1.5  
-# ✅ ピーク時の出来高が平均の何倍以上ならスパイクと判定
-
 DOUBLE_PATTERN_VOLATILITY_JUMP = True  
-# ✅ ボラティリティ急増も検出条件に含めるかどうか
-
 DOUBLE_PATTERN_VOLATILITY_RATIO = 1.3  
-# ✅ ボラ急増とみなす倍率（現在のstd > 平均std×この値）
-# 推奨：1.2〜1.5
+# ✅ パターンの確認本数、ピーク数、誤差率、出来高・ボラ条件
 
 
-VOLATILITY_JUMP_RATIO = 1.3
-# ✅ 現在の標準偏差が平均の1.3倍を超えていれば「ボラティリティ急増」と判断
-# 推奨値：1.2～1.5（小さすぎると過検出、大きすぎると検出減）
+# ▼ ----- 共通：ボラティリティ急増の閾値 -----
 
-# ボックスレンジに出来高・ボラ条件を追加
-BOX_USE_VOLUME_SPIKE = True
-BOX_USE_VOLATILITY_FILTER = True
-BOX_VOLATILITY_RATIO = 1.2  # 現在のstdが過去の1.2倍以下ならOK
-
-
-# ▼ ブレイクアウト拡張条件（ボラ急増を有効化）
-BREAKOUT_USE_VOLATILITY_SPIKE = True   # ブレイク時にボラ急増していることを確認
-BREAKOUT_VOLATILITY_RATIO = 1.2        # 現在のボラが過去の1.2倍以上で「急増」とみなす
-
-CROSS_USE_VOLATILITY_FILTER = True
-CROSS_VOLATILITY_THRESHOLD = 0.5
+VOLATILITY_JUMP_RATIO = 1.3  
+# ✅ ボラが平均の何倍になったら「急増」と判定するか
 
 
 
@@ -353,43 +320,59 @@ def detect_uptrend(df_group):
 def detect_downtrend(df_group):
     return detect_trend(df_group, trend_type="down")
 
-# ▼ 【買い目】ゴールデンクロス検出（独立シグナル + ボラフィルター対応）
 def detect_golden_cross(df_group):
-    df = df_group.tail(30).copy()
-    if len(df) < CROSS_LOOKBACK:
+    df = df_group.tail(60).copy()
+    if len(df) < max(CROSS_SLOPE_LOOKBACK + 2, CROSS_PREV_ORDER_LOOKBACK + 2):
         return None
 
     df["MA_5"] = df["現在値"].rolling(window=MA_SHORT_WINDOW).mean()
     df["MA_25"] = df["現在値"].rolling(window=MA_MID_WINDOW).mean()
+    df["RSI"] = calculate_rsi(df["現在値"], period=RSI_PERIOD)
     df["標準偏差"] = df["現在値"].rolling(window=STD_WINDOW).std()
 
     volatility_ok = (
         df["標準偏差"].iloc[-1] < CROSS_VOLATILITY_THRESHOLD
         if CROSS_USE_VOLATILITY_FILTER else True
+    )
+
+    slope_short = df["MA_5"].iloc[-1] - df["MA_5"].iloc[-CROSS_SLOPE_LOOKBACK]
+    slope_mid = df["MA_25"].iloc[-1] - df["MA_25"].iloc[-CROSS_SLOPE_LOOKBACK]
+
+    prev_order_ok = all(
+        df["MA_5"].iloc[-i] < df["MA_25"].iloc[-i]
+        for i in range(2, 2 + CROSS_PREV_ORDER_LOOKBACK)
+    )
+
+    rsi_ok = (
+        df["RSI"].iloc[-1] > CROSS_RSI_THRESHOLD_BUY
+        if USE_RSI_FOR_CROSS else True
     )
 
     if (
         df["MA_5"].iloc[-2] < df["MA_25"].iloc[-2] and
         df["MA_5"].iloc[-1] > df["MA_25"].iloc[-1] and
-        volatility_ok
+        slope_short > 0 and slope_mid > 0 and
+        prev_order_ok and volatility_ok and rsi_ok
     ):
         return {
             "シグナル": "【買い目】ゴールデンクロス",
             "現在値": df["現在値"].iloc[-1],
             "MA_5": round(df["MA_5"].iloc[-1], 2),
-            "MA_25": round(df["MA_25"].iloc[-1], 2)
+            "MA_25": round(df["MA_25"].iloc[-1], 2),
+            "RSI": round(df["RSI"].iloc[-1], 1)
         }
     return None
 
 
-# ▼ 【売り目】デッドクロス検出（独立シグナル + ボラフィルター対応）
+
 def detect_dead_cross(df_group):
-    df = df_group.tail(30).copy()
-    if len(df) < CROSS_LOOKBACK:
+    df = df_group.tail(60).copy()
+    if len(df) < max(CROSS_SLOPE_LOOKBACK + 2, CROSS_PREV_ORDER_LOOKBACK + 2):
         return None
 
     df["MA_5"] = df["現在値"].rolling(window=MA_SHORT_WINDOW).mean()
     df["MA_25"] = df["現在値"].rolling(window=MA_MID_WINDOW).mean()
+    df["RSI"] = calculate_rsi(df["現在値"], period=RSI_PERIOD)
     df["標準偏差"] = df["現在値"].rolling(window=STD_WINDOW).std()
 
     volatility_ok = (
@@ -397,18 +380,34 @@ def detect_dead_cross(df_group):
         if CROSS_USE_VOLATILITY_FILTER else True
     )
 
+    slope_short = df["MA_5"].iloc[-1] - df["MA_5"].iloc[-CROSS_SLOPE_LOOKBACK]
+    slope_mid = df["MA_25"].iloc[-1] - df["MA_25"].iloc[-CROSS_SLOPE_LOOKBACK]
+
+    prev_order_ok = all(
+        df["MA_5"].iloc[-i] > df["MA_25"].iloc[-i]
+        for i in range(2, 2 + CROSS_PREV_ORDER_LOOKBACK)
+    )
+
+    rsi_ok = (
+        df["RSI"].iloc[-1] < CROSS_RSI_THRESHOLD_SELL
+        if USE_RSI_FOR_CROSS else True
+    )
+
     if (
         df["MA_5"].iloc[-2] > df["MA_25"].iloc[-2] and
         df["MA_5"].iloc[-1] < df["MA_25"].iloc[-1] and
-        volatility_ok
+        slope_short < 0 and slope_mid < 0 and
+        prev_order_ok and volatility_ok and rsi_ok
     ):
         return {
             "シグナル": "【売り目】デッドクロス",
             "現在値": df["現在値"].iloc[-1],
             "MA_5": round(df["MA_5"].iloc[-1], 2),
-            "MA_25": round(df["MA_25"].iloc[-1], 2)
+            "MA_25": round(df["MA_25"].iloc[-1], 2),
+            "RSI": round(df["RSI"].iloc[-1], 1)
         }
     return None
+
 
 
 def detect_box_range(df_group):
