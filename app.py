@@ -78,8 +78,8 @@ def get_dropbox_client():
     return dbx
 
 
-# ▼ 🔹追加関数①：今日の日付のCSVファイル一覧（hhmm順）を取得
-def list_today_csv_files(target_date=None):
+# ▼ 🔹修正済：CSVファイル一覧（hhmm順）を取得し、最新90件だけに絞る
+def list_today_csv_files(target_date=None, limit=90):
     dbx = get_dropbox_client()
     today = target_date if target_date else get_japan_time().strftime("%Y%m%d")
     files = []
@@ -104,13 +104,15 @@ def list_today_csv_files(target_date=None):
         print(f"🚫 Dropboxファイル一覧取得エラー: {e}")
         return []
 
-    return sorted(files, key=lambda x: x[0])
+    # hhmm順に並べて、最新 limit 件だけを取得
+    files_sorted = sorted(files, key=lambda x: x[0])
+    return files_sorted[-limit:]  # 最新limit件
 
 
-# ▼ 🔹追加関数②：ファイルを結合し、時系列データフレームを構築
+
 def build_intraday_dataframe(target_date=None):
     dbx = get_dropbox_client()
-    files = list_today_csv_files(target_date)
+    files = list_today_csv_files(target_date=target_date, limit=90)  # ← ここに制限を明示
     combined_df = []
 
     for hhmm, fname in files:
@@ -133,6 +135,7 @@ def build_intraday_dataframe(target_date=None):
     df_all = df_all.sort_values(by=["銘柄コード", "ファイル時刻"]).reset_index(drop=True)
 
     return df_all
+
 
 
 # ▼ ----- 上昇／【売り目】下降トレンド判定に必要な設定値（コメント付き） -----
