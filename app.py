@@ -235,6 +235,17 @@ DOUBLE_PATTERN_VOLATILITY_RATIO = 1.1
 VOLATILITY_JUMP_RATIO = 1.3  
 # ✅ ボラが平均の何倍になったら「急増」と判定するか
 
+# ▼ ----- ボックスブレイクアウト（ボックス上抜け / 下抜け）設定 -----
+
+BOX_BREAKOUT_LOOKBACK = 30  # ボックスレンジを構成する期間
+BOX_BREAKOUT_TOLERANCE = 0.01  # 上下端ブレイクとみなすための許容比率（1%上抜け / 下抜け）
+
+BOX_BREAKOUT_USE_VOLUME_SPIKE = True  # 出来高急増を必須条件にするか
+BOX_BREAKOUT_VOLUME_RATIO = 1.5  # 出来高が過去平均の何倍以上か
+
+BOX_BREAKOUT_USE_VOLATILITY_SPIKE = True  # ボラ急増を必須条件にするか
+BOX_BREAKOUT_VOLATILITY_RATIO = 1.2  # ボラが過去比で何倍以上か
+
 
 
 
@@ -409,68 +420,53 @@ def detect_dead_cross(df_group):
     return None
 
 
-
-def detect_box_range(df_group):
-    required_rows = BOX_RANGE_WINDOW + VOLUME_PAST_WINDOW + VOLUME_RECENT_WINDOW
-    if len(df_group) < required_rows:
+def detect_box_breakout(df_group):
+    required_len = BOX_BREAKOUT_LOOKBACK + VOLUME_RECENT_WINDOW + VOLUME_PAST_WINDOW
+    if len(df_group) < required_len:
         return None
 
-    df = df_group.tail(required_rows).copy()
-
-    # ボックスレンジ部分の価格シリーズ
-    price_series = df["現在値"].iloc[-BOX_RANGE_WINDOW:]
+    df = df_group.tail(required_len).copy()
+    price_series = df["現在値"].iloc[-BOX_BREAKOUT_LOOKBACK:]
     current = price_series.iloc[-1]
-    mean = price_series.mean()
-
-    if pd.isna(mean) or mean == 0:
-        code = df_group["銘柄コード"].iloc[-1]
-        name = df_group["銘柄名称"].iloc[-1]
-        print(f"⚠️ detect_box_range: 異常な平均値（{code} {name}）: mean={mean} → 判定スキップ")
-        return None
-
-    # BOX_TOLERANCEによるボックス内判定
-    if abs(current - mean) / mean > BOX_TOLERANCE:
-        return None
-
-    # 範囲計算
-    range_min = price_series.min()
-    range_max = price_series.max()
-    band_width = range_max - range_min
+    high = price_series.max()
+    low = price_series.min()
+    band_width = high - low
     if band_width == 0:
         return None
 
-    # 位置比率（0 = 下端、1 = 上端）
-    position_ratio = (current - range_min) / band_width
+    # ブレイク判定（±BOX_BREAKOUT_TOLERANCE）
+    breakout_up = current > high * (1 + BOX_BREAKOUT_TOLERANCE)
+    breakout_down = current < low * (1 - BOX_BREAKOUT_TOLERANCE)
 
-    # 出来高急増判定
+    # 出来高急増チェック
     volume_ok = True
-    if BOX_USE_VOLUME_SPIKE:
+    if BOX_BREAKOUT_USE_VOLUME_SPIKE:
         recent_vol = df["出来高"].iloc[-VOLUME_RECENT_WINDOW:].mean()
         past_vol = df["出来高"].iloc[-(VOLUME_RECENT_WINDOW + VOLUME_PAST_WINDOW):-VOLUME_RECENT_WINDOW].mean()
-        volume_ok = recent_vol > past_vol * BREAKOUT_VOLUME_RATIO
+        volume_ok = recent_vol > past_vol * BOX_BREAKOUT_VOLUME_RATIO
 
-    # ボラティリティ安定判定
+    # ボラティリティ急増チェック
     volatility_ok = True
-    if BOX_USE_VOLATILITY_FILTER:
+    if BOX_BREAKOUT_USE_VOLATILITY_SPIKE:
         std_now = price_series.std()
         std_past = df["現在値"].iloc[-(VOLUME_RECENT_WINDOW + VOLUME_PAST_WINDOW):-VOLUME_RECENT_WINDOW].std()
-        volatility_ok = std_now < std_past * BOX_VOLATILITY_RATIO
+        volatility_ok = std_now > std_past * BOX_BREAKOUT_VOLATILITY_RATIO
 
-    # 条件満たせばシグナル返す
-    if position_ratio <= (1 - BOX_EDGE_THRESHOLD) and volume_ok and volatility_ok:
+    if breakout_up and volume_ok and volatility_ok:
         return {
-            "シグナル": "【買い目】ボックスレンジ",
+            "シグナル": "【買い目】ボックス上抜け",
             "現在値": current,
-            "平均値": round(mean, 2)
+            "上限ブレイク基準": round(high, 2)
         }
-    elif position_ratio >= BOX_EDGE_THRESHOLD and volume_ok and volatility_ok:
+    elif breakout_down and volume_ok and volatility_ok:
         return {
-            "シグナル": "【売り目】ボックスレンジ",
+            "シグナル": "【売り目】ボックス下抜け",
             "現在値": current,
-            "平均値": round(mean, 2)
+            "下限ブレイク基準": round(low, 2)
         }
 
     return None
+
 
 
 def detect_breakout(df_group):
@@ -591,7 +587,7 @@ def format_output_html(df):
     signal_order = [
         "【買い目】上昇トレンド", "【売り目】下降トレンド",
         "【買い目】ゴールデンクロス", "【売り目】デッドクロス",
-        "【買い目】ボックスレンジ", "【売り目】ボックスレンジ",
+        "【買い目】ボックス上抜け", "【売り目】ボックス下抜け",
         "【買い目】ブレイクアウト", "【売り目】ブレイクアウト",
         "【買い目】ダブルボトム", "【売り目】ダブルトップ"
     ]
@@ -742,8 +738,10 @@ def analyze_and_display_filtered_signals(df, current_time):
                 for detector in [
                     detect_uptrend, detect_downtrend,
                     detect_golden_cross, detect_dead_cross,
-                    detect_box_range, detect_breakout, detect_double_pattern
+                    detect_box_breakout,
+                    detect_breakout, detect_double_pattern
                 ]:
+
                     result = detector(df_group)
                     if result:
                         result.update({"銘柄コード": code, "銘柄名称": name})
